@@ -1,0 +1,46 @@
+/* KeyPost Locksmith brand: steel + brass. */
+:root { --kp-steel:#1c2733; --kp-steel-2:#2a3949; --kp-brass:#d9a441; --kp-brass-dark:#a8761f; --kp-brass-soft:#fbf3e2; }
+.topbar .topbar-brand { padding:6px; gap:10px; flex:0 0 auto; width:auto; min-width:max-content; }
+
+@media(min-width:901px) {
+  .topbar .topbar-inner { gap:20px; }
+  .topbar .accounts { margin-left:auto; flex:0 1 auto; }
+  .topbar .topbar-identity { margin-left:auto; }
+}
+@media(max-width:900px) {
+  .topbar .topbar-brand { flex:1 1 100%; width:100%; min-width:0; }
+}
+
+.kp-brand { display:inline-flex; align-items:center; gap:11px; text-decoration:none; }
+.kp-brand-icon { display:block; flex:0 0 auto; width:40px; height:40px; }
+.kp-brand-text { display:flex; flex-direction:column; gap:3px; line-height:1; }
+.kp-brand-text strong { color:var(--kp-steel); font-size:23px; font-weight:800; letter-spacing:-.2px; }
+.kp-brand-text strong em { font-style:normal; color:var(--kp-brass-dark); }
+.kp-brand-text small { color:#6a7584; font-size:9.5px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase; }
+.login-card .kp-brand-icon { width:52px; height:52px; }
+.login-card .kp-brand-text strong { font-size:28px; }
+@media(max-width:400px) { .kp-brand-text strong { font-size:20px; } .kp-brand-icon { width:34px; height:34px; } }
+
+/* Sidebar: steel text, brass accents. */
+.sidebar .sidebar-heading strong,
+.sidebar .menu li:not(.active) .menu-link-wrap,
+.sidebar .menu li:not(.active) .menu-link-wrap a { color:var(--kp-steel); }
+.sidebar .sidebar-heading-kicker { color:var(--kp-brass-dark); }
+.sidebar .menu li:not(.active) .menu-icon { border-color:#d8c49b; background:#fff; }
+.sidebar .menu li:not(.active) .menu-icon svg { stroke:var(--kp-brass-dark); }
+.sidebar .menu li:not(.active) .menu-link-wrap:hover { border-color:#ecd9b0; background:var(--kp-brass-soft); box-shadow:0 7px 18px rgba(28,39,51,.08); }
+.sidebar .menu li.active .menu-link-wrap { box-shadow:inset 3px 0 var(--kp-brass); }
+.sidebar .menu li.active .menu-icon svg { stroke:var(--kp-brass); }
+.sidebar .sidebar-tip { border-color:#ecd9b0; box-shadow:0 7px 22px rgba(28,39,51,.08); }
+
+/* Pop-up messages: steel text, brass accent; green / red only mark success and problems. */
+.message-box { border:1px solid #e6dcc6; border-top:3px solid var(--kp-steel); background:#fff; box-shadow:0 18px 44px rgba(28,39,51,.18); }
+.message-box > div { gap:12px; min-height:62px; padding:15px 48px 15px 16px; border-left:0 !important; color:var(--kp-steel) !important; font-size:14px; font-weight:600; line-height:1.5; }
+.message-box > div::before { width:28px; height:28px; flex-basis:28px; border-radius:50%; background:var(--kp-brass-soft); color:var(--kp-brass-dark); font-size:14px; }
+.message-box > .message-success::before { background:#eaf5ee; color:#23794a; }
+.message-box > .message-failed::before { background:#fbeceb; color:#b3372f; }
+.message-box:has(> .message-success) { border-top-color:#23794a; }
+.message-box:has(> .message-failed) { border-top-color:#b3372f; }
+.message-box:has(> .message-loading) { border-top-color:var(--kp-brass); }
+.message-box .close-msg { color:#8a94a1; }
+.message-box .close-msg:hover { background:var(--kp-brass-soft); color:var(--kp-steel); }

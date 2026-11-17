@@ -1,0 +1,51 @@
+/* Manage Listings: the embedded Chrome fills the content area; header and sidebar stay as on other pages. */
+body:has(.manage-listings) {overflow:hidden;}
+.content:has(.manage-listings) {box-sizing:border-box; height:100vh; min-height:0; padding-right:6px; padding-bottom:6px; padding-left:6px; overflow:hidden;}
+.manage-listings {display:flex; flex-direction:column; gap:6px; width:100%; height:100%; min-height:0;}
+.manage-listings-surface {position:relative; flex:1 1 auto; box-sizing:border-box; width:100%; min-height:0; overflow:hidden; background:#f5f7fa;}
+.manage-listings-placeholder {position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; padding:20px; color:#28496f; text-align:center;}
+.manage-listings-placeholder[hidden] {display:none;}
+.manage-listings-placeholder-icon {display:grid; place-items:center; width:52px; height:52px; margin-bottom:2px; border:1px solid #ccdaea; background:#e9f1fb; color:var(--app-blue);}
+.manage-listings-placeholder-icon svg {width:26px; height:26px; fill:none; stroke:currentColor; stroke-width:1.5;}
+.manage-listings-placeholder strong {font-size:15px;}
+.manage-listings-placeholder p {max-width:460px; margin:0; color:#65758c; font-size:12px;}
+.manage-listings-retry {height:34px; margin-top:4px; padding:0 14px; border:0; border-radius:7px; background:var(--app-blue); color:#fff; font-size:12px; font-weight:700; cursor:pointer;}
+.manage-listings-retry[hidden] {display:none;}
+.manage-listings-retry:hover {background:var(--app-blue-dark);}
+.manage-listings-retry:focus-visible {outline:2px solid #db6b3b; outline-offset:2px;}
+
+/* Delete / Repost controls in the header: one button that walks through select -> confirm -> running.
+   KeyPost theme: steel text, brass accents; red only for deleting. */
+.topbar .ml-actions {display:flex; align-items:center; gap:10px; flex:0 0 auto;}
+.topbar .ml-actions[hidden], .topbar .ml-actions [hidden] {display:none;}
+.ml-select-all {display:inline-flex; align-items:center; gap:8px; height:44px; padding:0 12px; border:1px solid #e3d6bb; border-radius:8px; background:#fff; color:#1c2733; font-size:13px; font-weight:700; cursor:pointer; user-select:none;}
+.ml-select-all:hover {background:#fbf3e2;}
+.ml-select-all input {width:16px; height:16px; margin:0; accent-color:#1c2733; cursor:pointer;}
+.ml-delete {position:relative; display:inline-flex; align-items:center; gap:8px; height:44px; padding:0 18px; border:1px solid #e9c4c0; border-radius:8px; background:#fff; color:#b3372f; font-size:14px; font-weight:700; white-space:nowrap; cursor:pointer; box-shadow:0 1px 2px rgba(28,39,51,.06); transition:background .15s, color .15s, border-color .15s, box-shadow .15s;}
+.ml-delete svg {width:17px; height:17px; flex:0 0 17px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+.ml-delete:hover:not(:disabled) {background:#fdf3f2; border-color:#d99a94; box-shadow:0 4px 12px rgba(179,55,47,.12);}
+.ml-delete:disabled {opacity:.45; cursor:not-allowed; box-shadow:none;}
+.ml-delete:focus-visible, .ml-stop:focus-visible, .ml-select-all:focus-within {outline:2px solid #d9a441; outline-offset:2px;}
+/* Picking listings: "Cancel" or "Delete 3". */
+.ml-delete[data-state="selecting"] {border-color:#b3372f; background:#fff7f6;}
+/* Second click within 5 s confirms. */
+.ml-delete[data-state="confirm"] {border-color:#b3372f; background:#b3372f; color:#fff;}
+.ml-delete[data-state="confirm"]:hover:not(:disabled) {background:#962c25; border-color:#962c25;}
+/* Running: small spinner on the button. */
+.ml-spinner {display:none;}
+.ml-delete[data-state="running"] {border-color:#e3d6bb; background:#fbf3e2; color:#1c2733; cursor:progress; opacity:1; box-shadow:none;}
+.ml-delete[data-state="running"] svg {visibility:hidden;}
+.ml-delete[data-state="running"] .ml-spinner {position:absolute; left:18px; top:50%; display:block; width:13px; height:13px; margin-top:-8.5px; border:2px solid #ecd9b0; border-top-color:#a8761f; border-radius:50%; animation:ml-spin .8s linear infinite;}
+.ml-stop {height:44px; padding:0 16px; border:1px solid #c9ced6; border-radius:8px; background:#fff; color:#1c2733; font-size:14px; font-weight:700; cursor:pointer;}
+.ml-stop:hover:not(:disabled) {background:#f2f4f7;}
+.ml-stop:disabled {opacity:.6; cursor:default;}
+@keyframes ml-spin {to {transform:rotate(360deg);}}
+/* Repost: steel and brass instead of red. */
+.ml-delete.ml-repost {border-color:#e3d6bb; color:#1c2733;}
+.ml-delete.ml-repost svg {color:#a8761f;}
+.ml-delete.ml-repost:hover:not(:disabled) {background:#fbf3e2; border-color:#d9a441; box-shadow:0 4px 12px rgba(168,118,31,.14);}
+.ml-delete.ml-repost[data-state="selecting"] {border-color:#1c2733; background:#fbf3e2;}
+.ml-delete.ml-repost[data-state="confirm"] {border-color:#1c2733; background:#1c2733; color:#f3d48f;}
+.ml-delete.ml-repost[data-state="confirm"] svg {color:#f3d48f;}
+.ml-delete.ml-repost[data-state="confirm"]:hover:not(:disabled) {background:#121a23;}
+.ml-delete.ml-repost[data-state="running"] {border-color:#e3d6bb; background:#fbf3e2; color:#1c2733;}

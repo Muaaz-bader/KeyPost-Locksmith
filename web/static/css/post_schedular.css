@@ -1,0 +1,285 @@
+.schedular-page {
+  max-width: 1100px;
+  margin: 24px auto;
+  padding: 0 18px 30px;
+  color: #1e272e;
+}
+
+.schedular-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-end;
+  margin-bottom: 22px;
+}
+
+.schedular-head h1 {
+  font-size: 28px;
+  margin-bottom: 6px;
+}
+
+.schedular-head p {
+  color: #5f6368;
+  font-size: 14px;
+}
+
+.schedular-meta {
+  background: linear-gradient(135deg, #f4fbff, #eaf6ff);
+  border: 1px solid #cfe9f6;
+  padding: 12px 16px;
+  border-radius: 0;
+  text-align: right;
+  min-width: 220px;
+}
+
+.meta-label {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64707c;
+}
+
+.meta-value {
+  font-weight: 700;
+  font-size: 14px;
+  color: #0b5f75;
+  word-break: break-word;
+}
+
+.schedular-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.stat-card {
+  background: #ffffff;
+  border-radius: 0;
+  padding: 18px;
+  border: 1px solid #e6ebf2;
+  box-shadow: 0 8px 20px rgba(17, 40, 68, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-label {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #77808a;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.schedular-page .next-run-value { font-size: 16px; line-height: 1.5; text-align: right; }
+.schedular-page .posting-time { min-width: 170px; white-space: nowrap; }
+.schedular-page .posting-time-label { display: block; color: #55606b; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+.schedular-page .posting-time-clock { display: block; color: #174c91; font-size: 18px; font-weight: 750; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.schedular-page .posting-time-date { display: block; color: #55606b; font-size: 12px; margin-top: 3px; }
+.schedular-page .posting-duration { min-width: 110px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.schedular-page .posting-duration-value { color: #166534; font-weight: 700; }
+.schedular-page .vehicle-summary { display: flex; align-items: center; gap: 10px; min-width: 220px; }
+.schedular-page .vehicle-thumb,
+.schedular-page .vehicle-thumb-placeholder { width: 58px; height: 58px; flex: 0 0 58px; border-radius: 8px; }
+.schedular-page .vehicle-thumb[hidden],
+.schedular-page .vehicle-thumb-placeholder[hidden] { display: none; }
+.schedular-page .vehicle-thumb { display: block; object-fit: cover; border: 1px solid #e2e8f0; background: #f1f5f9; }
+.schedular-page .vehicle-thumb-placeholder { display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 4px; color: #7b8794; background: #f1f5f9; border: 1px dashed #cbd5e1; font-size: 10px; text-align: center; }
+.schedular-page .vehicle-title { display: -webkit-box; max-width: 250px; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.35; overflow-wrap: anywhere; }
+
+.schedular-table {
+  background: #ffffff;
+  border-radius: 0;
+  padding: 18px 20px 22px;
+  border: 1px solid #e6ebf2;
+  box-shadow: 0 8px 24px rgba(17, 40, 68, 0.08);
+}
+
+.table-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 16px;
+}
+
+.table-head h2 {
+  font-size: 20px;
+}
+
+.table-sub {
+  font-size: 12px;
+  color: #78838d;
+}
+
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+thead th {
+  text-align: left;
+  padding: 10px 8px;
+  font-size: 13px;
+  color: #55606b;
+  border-bottom: 1px solid #e5ebf1;
+}
+
+tbody td {
+  padding: 12px 8px;
+  border-bottom: 1px solid #eef2f6;
+  font-size: 14px;
+}
+
+tbody tr:hover {
+  background: #f7fbff;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  padding: 3px 8px;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.status-pending {
+  background: #fff8e5;
+  color: #8a6d1d;
+  border: 1px solid #f3dc9c;
+}
+
+.status-posting {
+  background: #e9f6ff;
+  color: #0b5f75;
+  border: 1px solid #b9e3f7;
+}
+
+.status-posted {
+  background: #e9fbf0;
+  color: #1a7f4b;
+  border: 1px solid #b7eccf;
+}
+
+.status-opened {
+  background: #e9fbf0;
+  color: #1a7f4b;
+  border: 1px solid #b7eccf;
+}
+
+.status-failed {
+  background: #fdecea;
+  color: #8f2e2e;
+  border: 1px solid #f3c0bc;
+}
+
+.delete-btn {
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.2s ease;
+}
+
+.delete-btn:hover {
+  background: #c0392b;
+  transform: translateY(-1px);
+}
+
+.schedular-page .table-head { gap: 16px; flex-wrap: wrap; }
+.schedular-page #clear-posting-results { white-space: nowrap; }
+.schedular-page #clear-posting-results:disabled { opacity: .6; cursor: default; transform: none; }
+.schedular-page #clear-results-message { font-size: 13px; color: #174c91; }
+
+.muted {
+  color: #9aa4ae;
+  font-size: 12px;
+}
+
+.empty {
+  text-align: center;
+  padding: 20px 12px;
+  color: #7a8590;
+}
+
+@media (max-width: 760px) {
+  .schedular-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .schedular-meta {
+    width: 100%;
+    text-align: left;
+  }
+
+  .stat-card {
+    justify-content: flex-start;
+    gap: 12px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  .schedular-page .vehicle-summary { min-width: 190px; gap: 8px; }
+  .schedular-page .vehicle-thumb,
+  .schedular-page .vehicle-thumb-placeholder { width: 48px; height: 48px; flex-basis: 48px; }
+}
+
+
+/* ---- KeyPost theme and layout fixes ---------------------------------- */
+.schedular-page { max-width: 1200px; box-sizing: border-box; }
+.schedular-page .schedular-meta { background: #fbf3e2; border-color: #ecd9b0; }
+.schedular-page .meta-value { color: #1c2733; }
+.schedular-page .stat-card { box-shadow: 0 6px 18px rgba(28, 39, 51, .06); }
+.schedular-page .stat-value { color: #1c2733; }
+.schedular-page .table-head { align-items: center; }
+.schedular-page .table-head > div { min-width: 0; }
+.schedular-page #clear-posting-results { flex: 0 0 auto; }
+.schedular-page .delete-btn { background: #fff; color: #b3372f; border: 1px solid #e9c4c0; padding: 8px 14px; }
+.schedular-page .delete-btn:hover:not(:disabled) { background: #fdf3f2; border-color: #d99a94; transform: none; }
+/* Long text wraps inside its column instead of pushing the page wider. */
+.schedular-page table { table-layout: auto; }
+.schedular-page tbody td { vertical-align: middle; overflow-wrap: anywhere; }
+.schedular-page tbody tr:hover { background: #fbf8f1; }
+.schedular-page .vehicle-title { -webkit-line-clamp: 3; color: #1c2733; font-weight: 600; }
+.schedular-page .listing-kind-label { display: block; margin-bottom: 3px; color: #a8761f; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.schedular-page .posting-time-clock { color: #1c2733; }
+.schedular-page .status-cell { min-width: 170px; max-width: 340px; }
+.schedular-page .status-error { margin: 7px 0 0; color: #8f2e2e; font-size: 12.5px; line-height: 1.45; }
+.schedular-page .status-details { margin-top: 5px; }
+.schedular-page .status-details summary { color: #a8761f; font-size: 12px; font-weight: 700; cursor: pointer; }
+.schedular-page .status-details pre { max-height: 180px; margin: 6px 0 0; padding: 8px 10px; overflow: auto; border: 1px solid #e6dcc6; background: #faf8f3; color: #454545; font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-all; }
+.schedular-page .status-posting { background: #fbf3e2; color: #a8761f; border-color: #ecd9b0; }
+.schedular-page .status-pending, .schedular-page .status-waiting { background: #f2f4f7; color: #454545; border: 1px solid #d0d5dc; }
+.schedular-page .status-cancelled { background: #f2f4f7; color: #6b7280; border: 1px solid #d0d5dc; }

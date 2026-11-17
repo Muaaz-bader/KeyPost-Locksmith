@@ -1,0 +1,769 @@
+from io import BytesIO
+from pathlib import Path
+import tempfile
+import threading
+import unittest
+from unittest.mock import MagicMock, patch
+from PIL import Image
+from automation import delete_listing_import as importer
+from automation import reposting
+
+
+class ImportDetailsTests(unittest.TestCase):
+    def test_selected_model_rejects_previous_inventory_title(self):
+        driver = MagicMock()
+        stale, selected = MagicMock(), MagicMock()
+        stale.text = '2018 Dodge Challenger · SCAT PACK 6.4'
+        selected.text = '2018 Dodge Durango · GT V6'
+        driver.find_elements.return_value = [stale, selected]
+        self.assertEqual(reposting._model_from_visible_listing_heading(
+            driver, '2018', 'Dodge', False, expected_model='Durango · GT V6'), 'Durango · GT V6')
+        driver.find_elements.return_value = [stale]
+        self.assertEqual(reposting._model_from_visible_listing_heading(
+            driver, '2018', 'Dodge', False, expected_model='Durango · GT V6'), '')
+
+    def test_compound_make_keeps_model_without_duplicate_rover(self):
+        record = importer._listing_from_candidate({
+            'title': '2017 Land Rover Range Rover Sport', 'text': '$15,500'})
+        self.assertEqual(record['make'], 'Land Rover')
+        self.assertEqual(record['model'], 'Range Rover Sport')
+
+    def test_available_url_waits_for_cards_without_manage_listings(self):
+        driver = MagicMock()
+        driver.current_url = importer.AVAILABLE_SELLING_URL
+        with patch.object(importer, 'WebDriverWait') as wait, \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=[{'title': '2020 Ford Focus'}]), \
+             patch.object(importer, '_click_manage_listings') as manage:
+            wait.return_value.until.side_effect = lambda condition: condition(driver)
+            self.assertTrue(importer._open_available_url(driver))
+        driver.get.assert_called_once_with(importer.AVAILABLE_SELLING_URL)
+        manage.assert_not_called()
+
+    def test_available_url_rejects_login_redirect(self):
+        driver = MagicMock()
+        driver.current_url = 'https://www.facebook.com/login/'
+        with patch.object(importer, 'WebDriverWait') as wait:
+            wait.return_value.until.side_effect = lambda condition: condition(driver)
+            self.assertFalse(importer._open_available_url(driver))
+
+    def test_url_fallback_reads_once_and_returns_to_same_filtered_url(self):
+        driver = MagicMock()
+        driver.current_url = importer.AVAILABLE_SELLING_URL
+        driver.execute_script.return_value = 100
+        card = {'title': '2020 Ford Focus', 'text': '$100', 'element': MagicMock()}
+
+        def read(account, record, **kwargs):
+            kwargs['return_to_inventory'](driver)
+            return {'posts': [{'image_urls': ['photo']}], 'edit_url': ''}
+
+        with patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'load_listings', return_value={'listings': []}), \
+             patch.object(importer, 'WebDriverWait'), \
+             patch.object(importer, '_set_available_filter', return_value=False), \
+             patch.object(importer, '_open_available_url', return_value=True) as open_url, \
+             patch.object(importer, '_click_manage_listings') as manage, \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=[card]), \
+             patch.object(importer, 'read_listing_from_manage', side_effect=read) as reader, \
+             patch.object(importer, 'download_listing_images', return_value=([{'path': 'photo'}], [])), \
+             patch.object(importer, 'save_listings'), patch.object(importer.time, 'sleep'):
+            result = importer.import_listings_from_facebook('account')
+        manage.assert_not_called()
+        self.assertEqual(open_url.call_count, 2)
+        reader.assert_called_once()
+        self.assertEqual(len(result), 1)
+
+    def test_available_filter_confirms_radio_without_fixed_delay(self):
+        driver, radio = MagicMock(), MagicMock()
+        radio.is_displayed.return_value = True
+        checked = ['false']
+        radio.get_attribute.side_effect = lambda name: checked[0]
+        radio.click.side_effect = lambda: checked.__setitem__(0, 'true')
+        driver.find_elements.return_value = [radio]
+        with patch.object(importer, 'WebDriverWait') as wait, patch.object(importer.time, 'sleep') as sleep:
+            wait.return_value.until.side_effect = lambda condition: condition(driver)
+            self.assertTrue(importer._set_available_filter(driver))
+        radio.click.assert_called_once()
+        sleep.assert_not_called()
+
+    def test_unconfirmed_filter_returns_false(self):
+        driver, radio = MagicMock(), MagicMock()
+        radio.is_displayed.return_value = True
+        radio.get_attribute.return_value = 'false'
+        driver.find_elements.return_value = [radio]
+        with patch.object(importer, 'WebDriverWait') as wait, patch.object(importer.time, 'sleep') as sleep:
+            wait.return_value.until.side_effect = lambda condition: condition(driver)
+            self.assertFalse(importer._set_available_filter(driver))
+        sleep.assert_not_called()
+
+    def test_filtered_import_does_not_open_manage_or_mark_hidden_backup_deleted(self):
+        driver = MagicMock()
+        driver.current_url = importer.SELLING_URL
+        driver.execute_script.return_value = 100
+        backup = {'id': 'hidden', 'year': '2019', 'make': 'Ford', 'model': 'Focus',
+                  'url': 'https://www.facebook.com/marketplace/item/999/', 'source_deleted': False}
+        candidate = {'title': '2020 Ford Focus', 'text': '$100', 'element': MagicMock()}
+        with patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'load_listings', return_value={'listings': [backup]}), \
+             patch.object(importer, 'WebDriverWait'), \
+             patch.object(importer, '_set_available_filter', return_value=True), \
+             patch.object(importer, '_click_manage_listings') as manage, \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=[candidate]), \
+             patch.object(importer, 'read_listing_from_manage', return_value={'posts': [{'image_urls': ['photo']}], 'edit_url': ''}) as reader, \
+             patch.object(importer, 'download_listing_images', return_value=([{'path': 'photo'}], [])), \
+             patch.object(importer, 'save_listings'), patch.object(importer.time, 'sleep'):
+            results = importer.import_listings_from_facebook('account')
+        manage.assert_not_called()
+        reader.assert_called_once()
+        self.assertTrue(callable(reader.call_args.kwargs['return_to_inventory']))
+        self.assertFalse(next(item for item in results if item['id'] == 'hidden')['source_deleted'])
+
+    def test_repeated_sold_cards_stop_even_when_page_height_keeps_growing(self):
+        driver = MagicMock()
+        driver.current_url = importer.SELLING_URL
+        ticks = iter(range(100, 10000))
+        driver.execute_script.side_effect = lambda *args: next(ticks)
+        sold = {'title': '2020 Ford Focus', 'text': 'Sold'}
+        with patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'load_listings', return_value={'listings': []}), \
+             patch.object(importer, 'WebDriverWait'), \
+             patch.object(importer, '_set_available_filter', return_value=False), \
+             patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=[sold]) as scan, \
+             patch.object(importer, 'read_listing_from_manage') as read, \
+             patch.object(importer, 'save_listings'), patch.object(importer.time, 'sleep'), \
+             patch('builtins.print') as output:
+            importer.import_listings_from_facebook('account')
+        self.assertLessEqual(scan.call_count, 5)
+        read.assert_not_called()
+        self.assertEqual(sum('Skipping sold listing' in str(call) for call in output.call_args_list), 1)
+
+    def test_dead_browser_escapes_retry_handlers_immediately(self):
+        from selenium.common.exceptions import InvalidSessionIdException
+        driver = MagicMock()
+        original = driver.execute
+        original.side_effect = InvalidSessionIdException('Browser closed')
+        importer._guard_import_driver(driver, threading.Event())
+        with self.assertRaises(importer._ImportBrowserLost):
+            try:
+                driver.execute('findElement', {})
+            except Exception:
+                self.fail('A retry handler swallowed the lost browser signal')
+        original.assert_called_once()
+
+    def test_driver_connection_timeout_exceeds_page_timeout(self):
+        driver = MagicMock()
+        driver.current_url = importer.SELLING_URL
+        driver.execute_script.return_value = 100
+        with patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'load_listings', return_value={'listings': []}), \
+             patch.object(importer, 'WebDriverWait'), patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=[]), \
+             patch.object(importer, 'save_listings'), patch.object(importer.time, 'sleep'):
+            importer.import_listings_from_facebook('account')
+        driver.set_page_load_timeout.assert_called_once_with(30)
+        driver.set_script_timeout.assert_called_once_with(30)
+        self.assertEqual(driver.command_executor._client_config.timeout, 60)
+
+    def test_import_reads_first_card_before_discovering_next_and_skips_sold(self):
+        driver = MagicMock()
+        driver.current_url = importer.SELLING_URL
+        driver.execute_script.return_value = 100
+        first_card, second_card = MagicMock(), MagicMock()
+        first = {'title': '2020 Ford Focus', 'text': 'Active', 'element': first_card}
+        second = {'title': '2021 Ford Focus', 'text': 'Active', 'element': second_card}
+        sold = {'title': '2019 Ford Focus', 'text': 'Sold'}
+        events = []
+
+        def scan(current):
+            events.append('scan')
+            return [sold, first] if len(events) == 1 else [sold, first, second]
+
+        def read(account, record, **kwargs):
+            events.append(record['year'])
+            expected = first_card if record['year'] == '2020' else second_card
+            self.assertIs(kwargs['listing_card'], expected)
+            return {'posts': [{'image_urls': ['photo']}], 'edit_url': 'edit'}
+
+        with patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'load_listings', return_value={'listings': []}), \
+             patch.object(importer, 'WebDriverWait'), patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', side_effect=scan), \
+             patch.object(importer, 'read_listing_from_manage', side_effect=read), \
+             patch.object(importer, 'download_listing_images', return_value=([{'path': 'photo'}], [])), \
+             patch.object(importer, 'save_listings'), patch.object(importer.time, 'sleep'):
+            result = importer.import_listings_from_facebook('account')
+        self.assertEqual(events[:4], ['scan', '2020', 'scan', '2021'])
+        self.assertEqual(len(result), 2)
+
+    def test_direct_card_reader_does_not_search_inventory_again(self):
+        driver, card = MagicMock(), MagicMock()
+        driver.current_url = 'https://www.facebook.com/marketplace/edit/?listing_id=123'
+        link = MagicMock()
+        link.get_attribute.return_value = driver.current_url
+        with patch.object(reposting, '_open_manage_listings', return_value=True) as manage, \
+             patch.object(reposting, '_find_listing_card_with_scroll') as search, \
+             patch.object(reposting, '_safe_click', return_value=True) as click, \
+             patch.object(reposting, '_model_from_visible_listing_heading', return_value='Focus'), \
+             patch.object(reposting, '_find_edit_listing_link', return_value=link), \
+             patch.object(reposting, 'WebDriverWait'):
+            reposting.read_listing_from_manage('account',
+                {'year': '2020', 'make': 'Ford', 'model': 'Focus'}, driver=driver,
+                listing_card=card, field_reader=lambda current: {'posts': [{}]})
+        self.assertIs(click.call_args_list[0].args[1], card)
+        search.assert_not_called()
+        manage.assert_called_once_with(driver)  # Return after reading, not before clicking.
+
+    def test_read_timeout_escapes_retry_handlers_and_restores_driver(self):
+        driver = MagicMock()
+        original = driver.execute
+        with patch.object(importer.time, 'monotonic', side_effect=[0, 121]):
+            with self.assertRaisesRegex(RuntimeError, '120-second'):
+                with importer._listing_read_deadline(driver):
+                    try:
+                        driver.execute('findElement', {})
+                    except Exception:
+                        self.fail('The retry handler swallowed the listing timeout')
+        self.assertIs(driver.execute, original)
+
+    def test_failed_first_listing_does_not_stop_next_layout(self):
+        driver = MagicMock()
+        driver.current_url = importer.SELLING_URL
+        driver.execute_script.return_value = 100
+        candidates = [{'href': f'https://www.facebook.com/marketplace/item/{number}/',
+                       'title': f'{year} Ford Focus', 'text': 'Active'}
+                      for number, year in [(123, 2020), (124, 2021)]]
+        with patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'load_listings', return_value={'listings': []}), \
+             patch.object(importer, 'WebDriverWait'), patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=candidates), \
+             patch.object(importer, 'read_listing_from_manage', side_effect=[RuntimeError('Unsupported layout'),
+                 {'posts': [{'title': '2021 Ford Focus', 'image_urls': ['photo']}], 'edit_url': 'edit'}]) as reader, \
+             patch.object(importer, 'download_listing_images', return_value=([{'path': 'photo'}], [])), \
+             patch.object(importer, 'save_listings'), patch.object(importer.time, 'sleep'):
+            result = importer.import_listings_from_facebook('account')
+        self.assertEqual(reader.call_count, 2)
+        self.assertTrue(all(call.kwargs.get('visual_fallback') for call in reader.call_args_list))
+        self.assertEqual(result[0]['detail_error'], 'Unsupported layout')
+        self.assertEqual(result[1]['details']['title'], '2021 Ford Focus')
+
+    def test_item_editor_import_preserves_exact_title_without_vehicle_fallback(self):
+        driver = MagicMock()
+        driver.current_url = 'https://www.facebook.com/marketplace/edit/?listing_id=123'
+        link = MagicMock()
+        link.get_attribute.return_value = driver.current_url
+        snapshot = {key: {'value': '', 'state': 'unavailable'} for key in reposting.EDIT_FIELDS}
+        snapshot.update({key: {'value': value, 'state': 'read' if value else 'empty'}
+            for key, value in {'title': '1971 Chevrolet El camino - project', 'price': '$9,800',
+                              'description': 'Full description\nSecond line', 'category': '',
+                              'item_condition': '', 'sku': ''}.items()})
+        fallback = MagicMock()
+        with patch.object(reposting, '_open_manage_listings', return_value=True), \
+             patch.object(reposting, '_find_listing_card_with_scroll', return_value=MagicMock()), \
+             patch.object(reposting, '_safe_click', return_value=True), \
+             patch.object(reposting, '_model_from_visible_listing_heading', return_value=''), \
+             patch.object(reposting, '_find_edit_listing_link', return_value=link), \
+             patch.object(reposting, 'WebDriverWait'), \
+             patch.object(reposting, 'wait_for_edit_form_ready', return_value=snapshot), \
+             patch.object(reposting, 'read_edit_form_snapshot', return_value=snapshot), \
+             patch.object(reposting, '_scroll_down_page'), \
+             patch.object(reposting, '_safe_image_urls', return_value=['photo1', 'photo2']), \
+             patch.object(reposting, '_safe_input_value') as vehicle_reader:
+            result = reposting.read_listing_from_manage('account',
+                {'year': '1971', 'make': 'Chevrolet', 'model': 'El camino'}, driver=driver, visual_fallback=fallback)
+        self.assertEqual(result['posts'][0]['title'], '1971 Chevrolet El camino - project')
+        self.assertEqual(result['posts'][0]['image_urls'], ['photo1', 'photo2'])
+        self.assertEqual(result['posts'][0]['listing_format'], 'item')
+        fallback.assert_not_called()
+        vehicle_reader.assert_not_called()
+
+    def test_five_active_listings_survive_later_same_title_sold_cards_without_ids(self):
+        driver = MagicMock()
+        driver.current_url = importer.SELLING_URL
+        driver.execute_script.return_value = 100
+        titles = ['1971 Chevrolet El camino', '2018 Dodge Challenger SCAT PACK V8',
+                  '2021 Dodge Challenger SXT', '2015 Lexus RC 350', '2022 Dodge Charger SXT V6']
+        active = [{'title': title, 'text': 'Active\n$11,800'} for title in titles]
+        sold = [{'title': title, 'text': 'Sold\n$9,000'} for title in titles[:3]]
+        scans = iter([active, active + sold, active + sold, active + sold, active + sold])
+        counts = []
+        with patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'load_listings', return_value={'listings': []}), \
+             patch.object(importer, 'WebDriverWait'), patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', side_effect=lambda driver: next(scans, active + sold)), \
+             patch.object(importer, 'read_listing_from_manage', return_value={'posts': [{'image_urls': ['photo']}], 'edit_url': ''}) as reader, \
+             patch.object(importer, 'download_listing_images', return_value=([{'path': 'photo'}], [])), \
+             patch.object(importer, 'save_listings', side_effect=lambda account, items: counts.append(len(items))), \
+             patch.object(importer.time, 'sleep'):
+            result = importer.import_listings_from_facebook('account')
+        self.assertEqual(len(result), 5)
+        self.assertEqual(counts[-1], 5)
+        self.assertEqual(counts, sorted(counts))
+        self.assertEqual(reader.call_count, 5)
+        self.assertTrue(all(item['listing_status'] == 'active' for item in result))
+
+    def test_sold_without_id_does_not_remove_same_title_active_with_id(self):
+        driver = MagicMock()
+        driver.current_url = importer.SELLING_URL
+        driver.execute_script.return_value = 100
+        active = {'href': 'https://www.facebook.com/marketplace/item/123/',
+                  'title': '2021 Dodge Challenger SXT', 'text': 'Pending'}
+        sold = {'title': '2021 Dodge Challenger', 'text': 'Sold'}
+        with patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'load_listings', return_value={'listings': []}), \
+             patch.object(importer, 'WebDriverWait'), patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=[sold, active]), \
+             patch.object(importer, 'read_listing_from_manage', return_value={'posts': [{'image_urls': ['photo']}], 'edit_url': ''}), \
+             patch.object(importer, 'download_listing_images', return_value=([{'path': 'photo'}], [])), \
+             patch.object(importer, 'save_listings'), patch.object(importer.time, 'sleep'):
+            result = importer.import_listings_from_facebook('account')
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['listing_status'], 'pending')
+
+    def test_status_badges_do_not_confuse_actions_or_description_with_sold(self):
+        for text in ('Sold', '2020 Ford Focus\nSold · Listed on Monday'):
+            self.assertEqual(importer._candidate_listing_status({'text': text}), 'sold')
+        for text in ('Mark as sold', '2020 Ford Focus\nActive\nMark as sold',
+                     'Pending\nMark as sold', 'Available\nNever sold at auction'):
+            self.assertNotEqual(importer._candidate_listing_status({'text': text}), 'sold')
+
+    def test_import_skips_sold_duplicates_but_reads_active_and_pending(self):
+        driver = MagicMock()
+        driver.current_url = importer.SELLING_URL
+        driver.execute_script.return_value = 100
+        candidates = [
+            {'href': f'https://www.facebook.com/marketplace/item/{number}/',
+             'title': '2020 Ford Focus', 'text': status}
+            for number, status in [(123, ''), (123, 'Sold'), (124, 'Active'), (125, 'Pending')]
+        ]
+        with patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'load_listings', return_value={'listings': []}), \
+             patch.object(importer, 'WebDriverWait'), patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=candidates), \
+             patch.object(importer, 'read_listing_from_manage', return_value={'posts': [{'image_urls': ['photo']}], 'edit_url': 'edit'}) as reader, \
+             patch.object(importer, 'download_listing_images', return_value=([{'path': 'photo'}], [])), \
+             patch.object(importer, 'save_listings'), patch.object(importer.time, 'sleep'):
+            result = importer.import_listings_from_facebook('account')
+        self.assertEqual({item['listing_status'] for item in result}, {'active', 'pending'})
+        self.assertEqual(reader.call_count, 2)
+        self.assertTrue(all('/123/' not in call.args[1]['url'] for call in reader.call_args_list))
+
+    def test_already_saved_sold_backup_is_kept_without_reading(self):
+        candidate = {'href': 'https://www.facebook.com/marketplace/item/123/',
+                     'title': '2020 Ford Focus', 'text': 'Sold'}
+        record = dict(importer._listing_from_candidate(candidate), details={'price': '100'})
+        driver = MagicMock()
+        driver.current_url = importer.SELLING_URL
+        driver.execute_script.return_value = 100
+        with patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'load_listings', return_value={'listings': [record]}), \
+             patch.object(importer, 'WebDriverWait'), patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=[candidate]), \
+             patch.object(importer, 'read_listing_from_manage') as reader, \
+             patch.object(importer, 'save_listings'), patch.object(importer.time, 'sleep'):
+            result = importer.import_listings_from_facebook('account')
+        reader.assert_not_called()
+        self.assertEqual(result[0]['details'], {'price': '100'})
+        self.assertTrue(result[0]['facebook_present'])
+        self.assertFalse(result[0]['source_deleted'])
+
+    def test_stop_before_start_does_not_launch_browser(self):
+        stop = threading.Event()
+        stop.set()
+        with patch.object(importer, 'load_listings', return_value={'listings': []}), \
+             patch.object(importer, '_open_prelogged_facebook') as launch:
+            with self.assertRaises(importer.ListingImportCancelled):
+                importer.import_listings_from_facebook('account', stop_event=stop)
+        launch.assert_not_called()
+
+    def test_stop_closes_only_registered_account_import_driver(self):
+        driver, other = MagicMock(), MagicMock()
+        driver.service.process.poll.return_value = None
+        closed = threading.Event()
+        driver.quit.side_effect = lambda: closed.set()
+        with patch.dict(importer._active_import_drivers, {'account': driver, 'other': other}, clear=True):
+            self.assertTrue(importer.stop_listing_import_driver('account'))
+            self.assertFalse(importer.stop_listing_import_driver('missing'))
+            self.assertTrue(closed.wait(2))
+        driver.quit.assert_called_once()
+        driver.service.process.terminate.assert_called_once()
+        other.quit.assert_not_called()
+
+    def test_stop_returns_while_quit_is_blocked(self):
+        driver = MagicMock()
+        entered, release = threading.Event(), threading.Event()
+        driver.quit.side_effect = lambda: (entered.set(), release.wait(3))
+        try:
+            with patch.dict(importer._active_import_drivers, {'account': driver}, clear=True):
+                self.assertTrue(importer.stop_listing_import_driver('account'))
+                self.assertTrue(entered.wait(1))
+                self.assertFalse(release.is_set())
+        finally:
+            release.set()
+
+    def test_stop_signal_escapes_detail_reader_retry_and_keeps_saved_progress(self):
+        driver = MagicMock()
+        driver.current_url = importer.SELLING_URL
+        driver.execute_script.return_value = 100
+        stop = threading.Event()
+        candidate = {'href': 'https://www.facebook.com/marketplace/item/123/', 'title': '2020 Ford Focus'}
+
+        def read(*args, **kwargs):
+            stop.set()
+            try:
+                driver.execute('findElement', {})
+            except Exception:
+                self.fail('Cancellation was swallowed by a normal retry handler')
+            self.fail('A cancelled browser command was allowed')
+
+        with patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'load_listings', return_value={'listings': []}), \
+             patch.object(importer, 'WebDriverWait'), patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=[candidate]), \
+             patch.object(importer, 'read_listing_from_manage', side_effect=read), \
+             patch.object(importer, 'save_listings') as save, \
+             patch.object(importer, '_shutdown_import_driver'), patch.object(importer.time, 'sleep'):
+            with self.assertRaises(importer.ListingImportCancelled):
+                importer.import_listings_from_facebook('account', stop_event=stop)
+        self.assertTrue(save.called)
+        self.assertNotIn('account', importer._active_import_drivers)
+
+    def test_stop_during_cookie_restore_registers_browser_early(self):
+        driver = MagicMock()
+        stop = threading.Event()
+
+        def open_browser(*args, **kwargs):
+            kwargs['on_driver_ready'](driver)
+            self.assertIs(importer._active_import_drivers['account'], driver)
+            stop.set()
+            driver.execute('get', {})
+
+        with patch.object(importer, 'load_listings', return_value={'listings': []}), \
+             patch.object(importer, '_open_prelogged_facebook', side_effect=open_browser), \
+             patch.object(importer, '_shutdown_import_driver'):
+            with self.assertRaises(importer.ListingImportCancelled):
+                importer.import_listings_from_facebook('account', stop_event=stop)
+        self.assertNotIn('account', importer._active_import_drivers)
+
+    def test_stop_during_photo_download_closes_response_without_saving(self):
+        stop = threading.Event()
+        response = MagicMock()
+
+        def chunks(*args):
+            stop.set()
+            yield b'partial image'
+
+        response.iter_content.side_effect = chunks
+        session = MagicMock()
+        session.__enter__.return_value = session
+        session.get.return_value = response
+        with tempfile.TemporaryDirectory() as folder, \
+             patch.object(importer, 'IMPORT_DIR', Path(folder)), \
+             patch.object(importer.requests, 'Session', return_value=session):
+            with self.assertRaises(importer.ListingImportCancelled):
+                importer.download_listing_images(MagicMock(), 'account', '123',
+                    ['https://scontent.fbcdn.net/photo.jpg'], stop)
+            self.assertFalse(list(Path(folder).rglob('*.jpg')))
+        response.close.assert_called_once()
+
+    def test_fallback_fills_missing_and_empty_fields_but_not_colors(self):
+        post = {'price': '100', 'description': '', 'model': '',
+                'field_states': {'price': 'read', 'description': 'empty', 'model': 'unavailable'}}
+        fallback = MagicMock(return_value={'posts': [{'price': '999', 'description': 'Recovered description',
+            'model': 'Civic', 'exterior_color': 'Blue', 'field_states':
+            {'price': 'read', 'description': 'read', 'model': 'read', 'exterior_color': 'read'}}]})
+        reposting.recover_unreadable_fields(MagicMock(), post, fallback)
+        fallback.assert_called_once()
+        self.assertEqual(post['price'], '100')
+        self.assertEqual(post['description'], 'Recovered description')
+        self.assertEqual(post['model'], 'Civic')
+        self.assertNotIn('exterior_color', post)
+        self.assertEqual(post['field_sources']['model'], 'visual_fallback')
+
+    def test_colors_vin_and_trim_alone_do_not_trigger_fallback(self):
+        post = {key: 'saved' for key in reposting.EDIT_FIELDS}
+        post['field_states'] = {key: 'read' for key in reposting.EDIT_FIELDS}
+        for key in ('exterior_color', 'interior_color', 'vin', 'trim'):
+            post[key] = ''
+            post['field_states'][key] = 'unavailable'
+        fallback = MagicMock()
+        reposting.recover_unreadable_fields(MagicMock(), post, fallback,
+                                           fields=list(reposting.EDIT_FIELDS) + ['vin', 'trim'])
+        fallback.assert_not_called()
+
+    def test_fallback_error_preserves_primary_result(self):
+        post = {'price': '100', 'field_states': {'price': 'read'}}
+        reposting.recover_unreadable_fields(MagicMock(), post,
+            MagicMock(side_effect=RuntimeError('OCR failed')))
+        self.assertEqual(post['price'], '100')
+        self.assertEqual(post['fallback_error'], 'OCR failed')
+
+    def test_edit_read_returns_to_inventory_without_public_gallery_navigation(self):
+        driver = MagicMock()
+        edit_url = 'https://www.facebook.com/marketplace/edit/?listing_id=123'
+        driver.current_url = edit_url
+        driver.find_elements.return_value = []
+        link = MagicMock()
+        link.get_attribute.return_value = edit_url
+        snapshot = {key: {'value': 'saved', 'state': 'read'} for key in reposting.EDIT_FIELDS}
+        snapshot['price']['value'] = '100'
+        with patch.object(reposting, '_open_manage_listings', return_value=True) as manage, \
+             patch.object(reposting, '_find_listing_card_with_scroll', return_value=MagicMock()), \
+             patch.object(reposting, '_safe_click', return_value=True), \
+             patch.object(reposting, '_model_from_visible_listing_heading', return_value='Focus'), \
+             patch.object(reposting, '_find_edit_listing_link', return_value=link), \
+             patch.object(reposting, 'WebDriverWait'), \
+             patch.object(reposting, 'wait_for_edit_form_ready', return_value=snapshot), \
+             patch.object(reposting, 'read_edit_form_snapshot', return_value=snapshot), \
+             patch.object(reposting, '_scroll_down_page'), \
+             patch.object(reposting, '_safe_image_urls', return_value=['edit-photo']), \
+             patch.object(reposting, 'highest_resolution_listing_images') as gallery:
+            result = reposting.read_listing_from_manage('account',
+                {'year': '2020', 'make': 'Ford', 'model': 'Focus'}, driver=driver)
+        self.assertEqual(result['posts'][0]['price'], '100')
+        self.assertEqual(result['posts'][0]['image_urls'], ['edit-photo'])
+        self.assertEqual(manage.call_count, 2)
+        gallery.assert_not_called()
+        driver.get.assert_not_called()
+        driver.switch_to.new_window.assert_not_called()
+
+    def test_full_details_are_saved_using_same_browser(self):
+        driver = MagicMock()
+        driver.execute_script.return_value = 100
+        candidate = {'href': 'https://www.facebook.com/marketplace/item/123/',
+                     'title': '2020 Ford Focus', 'text': '$100\n5 clicks on listing'}
+        details = {'title': '2020 Ford Focus', 'description': 'Full description', 'image_urls': ['photo']}
+        with patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'load_listings', return_value={'listings': []}), \
+             patch.object(importer, 'WebDriverWait'), \
+             patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=[candidate]), \
+             patch.object(importer, 'read_listing_from_manage', return_value={'posts': [details], 'edit_url': 'edit'}) as reader, \
+             patch.object(importer, 'download_listing_images', return_value=([{'name': 'photo', 'path': 'local'}], [])), \
+             patch.object(importer, 'save_listings') as save, \
+             patch.object(importer.time, 'sleep'):
+            result = importer.import_listings_from_facebook('account', replace_existing=True)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['details']['description'], 'Full description')
+        self.assertEqual(result[0]['downloaded_images'][0]['path'], 'local')
+        self.assertIs(reader.call_args.kwargs['driver'], driver)
+        self.assertTrue(save.called)
+        driver.quit.assert_called_once()
+
+    def test_download_retains_exact_bytes_dimensions_and_order(self):
+        stream = BytesIO()
+        Image.new('RGB', (1000, 800), 'blue').save(stream, format='JPEG')
+        content = stream.getvalue()
+        response = MagicMock(content=content)
+        response.iter_content.return_value = [content]
+        session = MagicMock()
+        session.get.return_value = response
+        session.__enter__.return_value = session
+        driver = MagicMock()
+        driver.execute_script.return_value = 'test-agent'
+        driver.get_cookies.return_value = []
+        with tempfile.TemporaryDirectory() as folder, \
+             patch.object(importer, 'IMPORT_DIR', Path(folder)), \
+             patch.object(importer.requests, 'Session', return_value=session):
+            images, errors = importer.download_listing_images(driver, 'account', 'id',
+                ['https://scontent.example.fbcdn.net/photo.jpg'], threading.Event())
+            self.assertEqual(errors, [])
+            self.assertEqual(Path(images[0]['path']).read_bytes(), content)
+            self.assertEqual((images[0]['width'], images[0]['height']), (1000, 800))
+
+    def test_distinct_listing_urls_do_not_merge_same_vehicle_titles(self):
+        first = {'year': '2020', 'make': 'Ford', 'model': 'Focus', 'url': 'https://www.facebook.com/marketplace/item/1/'}
+        second = dict(first, url='https://www.facebook.com/marketplace/item/2/')
+        key = importer._matching_record_key({importer._record_key(first): first}, second)
+        self.assertNotEqual(key, importer._record_key(first))
+
+    def test_photo_saves_under_long_windows_project_path(self):
+        stream = BytesIO()
+        Image.new('RGB', (1000, 800), 'green').save(stream, format='JPEG')
+        content = stream.getvalue()
+        session = MagicMock()
+        session.__enter__.return_value = session
+        session.get.return_value = MagicMock(content=content)
+        session.get.return_value.iter_content.return_value = [content]
+        driver = MagicMock()
+        driver.execute_script.return_value = 'test-agent'
+        driver.get_cookies.return_value = []
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / ('x' * max(1, 165 - len(temporary) - 1))
+            with patch.object(importer, 'IMPORT_DIR', root), patch.object(importer.requests, 'Session', return_value=session):
+                images, errors = importer.download_listing_images(driver, 'account', 'x' * 20,
+                    ['https://scontent.example.fbcdn.net/photo.jpg'], threading.Event())
+            self.assertEqual(errors, [])
+            self.assertLess(len(images[0]['path'] + '.tmp'), 260)
+            self.assertEqual(Path(images[0]['path']).read_bytes(), content)
+
+    def test_original_source_id_must_match_before_repost_deletion(self):
+        link = MagicMock()
+        link.get_attribute.return_value = 'https://www.facebook.com/marketplace/edit/?listing_id=999'
+        with patch.object(importer, '_find_edit_listing_link', return_value=link):
+            self.assertFalse(importer._verify_repost_source(MagicMock(), {'_source_listing_id': '123'}))
+            self.assertTrue(importer._verify_repost_source(MagicMock(), {'_source_listing_id': '999'}))
+
+    def test_daily_import_keeps_backups_and_reads_only_new_live_listing(self):
+        driver = MagicMock()
+        driver.execute_script.return_value = 100
+        candidate = {'href': '', 'title': '2020 Ford Focus', 'text': '$100\n5 clicks on listing'}
+        old = {'id': importer._listing_from_candidate(candidate)['id'], 'year': '2020', 'make': 'Ford',
+               'model': 'Focus', 'source_deleted': True, 'details': {'title': 'Saved original'},
+               'downloaded_images': [{'name': 'old.jpg', 'path': 'old.jpg'}]}
+        absent = {'id': 'absent', 'year': '2018', 'make': 'Ford', 'model': 'Transit', 'details': {'title': 'Absent but saved'}}
+        details = {'title': '2020 Ford Focus', 'price': '100', 'image_urls': ['photo']}
+        with patch.object(importer, 'load_listings', return_value={'listings': [old, absent]}), \
+             patch.object(importer, '_open_prelogged_facebook', return_value=driver) as opener, \
+             patch.object(importer, 'WebDriverWait'), patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=[candidate]), \
+             patch.object(importer, 'read_listing_from_manage', return_value={'posts': [details], 'edit_url': 'edit'}) as reader, \
+             patch.object(importer, 'download_listing_images', return_value=([{'name': 'new.jpg', 'path': 'new.jpg'}], [])), \
+             patch.object(importer, 'save_listings'), patch.object(importer.time, 'sleep'):
+            result = importer.import_listings_from_facebook('account', replace_existing=True, only_new=True)
+        self.assertEqual(len(result), 3)
+        self.assertEqual(len({item['id'] for item in result}), 3)
+        self.assertEqual(result[0]['details']['title'], 'Saved original')
+        self.assertEqual(result[1]['details']['title'], 'Absent but saved')
+        reader.assert_called_once()
+        self.assertNotEqual(reader.call_args.args[1]['id'], old['id'])
+        self.assertEqual(opener.call_args.args, ('account',))
+        self.assertTrue(opener.call_args.kwargs['force_headless'])
+        self.assertTrue(callable(opener.call_args.kwargs['on_driver_ready']))
+
+    def test_daily_import_skips_complete_existing_details(self):
+        driver = MagicMock()
+        driver.execute_script.return_value = 100
+        candidate = {'href': 'https://www.facebook.com/marketplace/item/123/', 'title': '2020 Ford Focus'}
+        record = dict(importer._listing_from_candidate(candidate), details={'title': 'Saved'}, downloaded_images=[{'path': 'photo.jpg'}])
+        with patch.object(importer, 'load_listings', return_value={'listings': [record]}), \
+             patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'WebDriverWait'), patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=[candidate]), \
+             patch.object(importer, 'read_listing_from_manage') as reader, \
+             patch.object(importer.os.path, 'isfile', return_value=True), \
+             patch.object(importer, 'save_listings'), patch.object(importer.time, 'sleep'):
+            result = importer.import_listings_from_facebook('account', only_new=True)
+        reader.assert_not_called()
+        self.assertEqual(result[0]['details']['title'], 'Saved')
+
+    def test_delete_skips_same_title_with_wrong_facebook_id(self):
+        driver = MagicMock()
+        stop = MagicMock()
+        stop.is_set.return_value = False
+        stop.wait.return_value = False
+        first, second = MagicMock(), MagicMock()
+        candidates = [dict(title='2020 Ford Focus', text='$100', element=element, source='full_row_dom')
+                      for element in (first, second)]
+        stored = {'id': 'one', 'year': '2020', 'make': 'Ford', 'model': 'Focus', 'price': '$100', '_source_listing_id': '123'}
+        with patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'WebDriverWait'), patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, 'extract_delete_candidates', return_value=candidates), \
+             patch.object(importer, '_verify_repost_source', side_effect=[False, True]) as verify, \
+             patch.object(importer, '_complete_facebook_delete_dialog') as confirm:
+            result = importer.delete_selected_listings_from_facebook('account', [stored], stop_event=stop)
+        first.click.assert_called_once()
+        second.click.assert_called_once()
+        self.assertEqual(verify.call_count, 2)
+        confirm.assert_called_once()
+        self.assertEqual(result['deleted_ids'], ['one'])
+
+    def test_empty_scan_keeps_all_same_title_saved_backups(self):
+        driver = MagicMock()
+        driver.execute_script.return_value = 100
+        first = {'id': 'one', 'year': '2019', 'make': 'Ford', 'model': 'Transit', 'details': {'title': 'First saved listing'}}
+        second = dict(first, id='two', details={'title': 'Second saved listing'})
+        with patch.object(importer, 'load_listings', return_value={'listings': [first, second]}), \
+             patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'WebDriverWait'), patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=[]), \
+             patch.object(importer, 'read_listing_from_manage') as reader, \
+             patch.object(importer, 'save_listings'), patch.object(importer.time, 'sleep'):
+            result = importer.import_listings_from_facebook('account', only_new=True)
+        self.assertEqual([item['id'] for item in result], ['one', 'two'])
+        reader.assert_not_called()
+
+
+    def mock_inventory_import(self, existing, candidates, *, empty=False, url=importer.SELLING_URL, scroll_error=False):
+        driver = MagicMock()
+        driver.current_url = url
+        def script(code, *args):
+            if 'you haven' in code:
+                return empty
+            if scroll_error:
+                raise RuntimeError('Scroll failed')
+            return 100
+        driver.execute_script.side_effect = script
+        with patch.object(importer, 'load_listings', return_value={'listings': existing}), \
+             patch.object(importer, '_open_prelogged_facebook', return_value=driver), \
+             patch.object(importer, 'WebDriverWait'), patch.object(importer, '_click_manage_listings'), \
+             patch.object(importer, '_extract_visible_listing_candidates', return_value=candidates), \
+             patch.object(importer, 'read_listing_from_manage', side_effect=RuntimeError('Keep original backup')), \
+             patch.object(importer.os.path, 'isfile', return_value=True), \
+             patch.object(importer, 'save_listings'), patch.object(importer.time, 'sleep'):
+            return importer.import_listings_from_facebook('account', only_new=True)
+
+    def inventory_candidate(self, facebook_id):
+        return {'href': f'https://www.facebook.com/marketplace/item/{facebook_id}/',
+                'title': '2020 Ford Focus', 'text': '$100\n5 clicks on listing'}
+
+    def test_reimport_deduplicates_facebook_id_across_url_variants(self):
+        candidate = self.inventory_candidate('123')
+        record = dict(importer._listing_from_candidate(candidate), id='saved',
+                      url='https://www.facebook.com/marketplace/item/123/?ref=saved',
+                      details={'title': 'Saved'}, downloaded_images=[{'path': 'saved.jpg'}])
+        duplicate = dict(record, id='duplicate')
+        results = self.mock_inventory_import([record, duplicate], [candidate, candidate])
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['id'], 'saved')
+        self.assertTrue(results[0]['facebook_present'])
+
+    def test_cross_post_local_record_is_enriched_without_duplicate(self):
+        candidate = self.inventory_candidate('123')
+        record = dict(importer._listing_from_candidate(candidate), id='cross-local', url='',
+                      details={'title': 'Saved cross post'}, downloaded_images=[{'path': 'saved.jpg'}])
+        first = self.mock_inventory_import([record], [candidate])
+        second = self.mock_inventory_import(first, [candidate])
+        self.assertEqual(len(second), 1)
+        self.assertEqual(second[0]['id'], 'cross-local')
+        self.assertIn('/123/', second[0]['url'])
+
+    def test_confirmed_repost_matches_new_facebook_listing_without_duplicate(self):
+        candidate = self.inventory_candidate('456')
+        record = dict(importer._listing_from_candidate(self.inventory_candidate('123')),
+                      id='saved-repost', source_deleted=True, facebook_reposted=True,
+                      details={'title': 'Reposted'}, downloaded_images=[{'path': 'saved.jpg'}])
+        results = self.mock_inventory_import([record], [candidate])
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['id'], 'saved-repost')
+        self.assertIn('/456/', results[0]['url'])
+        self.assertFalse(results[0]['source_deleted'])
+
+    def test_absent_posted_listing_becomes_backup_and_keeps_details(self):
+        present = importer._listing_from_candidate(self.inventory_candidate('123'))
+        absent = dict(importer._listing_from_candidate(self.inventory_candidate('456')),
+                      details={'title': 'Saved backup'}, downloaded_images=[{'path': 'saved.jpg'}],
+                      facebook_reposted=True)
+        results = self.mock_inventory_import([present, absent], [self.inventory_candidate('123')])
+        saved = next(record for record in results if record['id'] == absent['id'])
+        self.assertFalse(saved['facebook_present'])
+        self.assertTrue(saved['source_deleted'])
+        self.assertFalse(saved['facebook_reposted'])
+        self.assertEqual(saved['details'], {'title': 'Saved backup'})
+        self.assertEqual(saved['downloaded_images'], [{'path': 'saved.jpg'}])
+
+    def test_empty_inventory_only_marks_missing_when_facebook_confirms_empty(self):
+        for empty in (False, True):
+            record = importer._listing_from_candidate(self.inventory_candidate('123'))
+            result = self.mock_inventory_import([record], [], empty=empty)[0]
+            self.assertEqual(result.get('source_deleted', False), empty)
+
+    def test_failed_or_blocked_scan_does_not_mark_missing(self):
+        for kwargs in ({'scroll_error': True}, {'url': 'https://www.facebook.com/checkpoint/'}):
+            record = importer._listing_from_candidate(self.inventory_candidate('123'))
+            with self.assertRaises(RuntimeError):
+                self.mock_inventory_import([record], [], **kwargs)
+            self.assertFalse(record.get('source_deleted', False))
+
+
+if __name__ == '__main__':
+    unittest.main()

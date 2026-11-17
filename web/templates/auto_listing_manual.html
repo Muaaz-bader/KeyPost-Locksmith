@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+{% from '_marketplace_colors.html' import color_options %}
+
+{% block title %}Manual Service Post{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/create_listings.css') }}">{% endblock %}
+
+{% block content %}
+<main class="create-page manual-listing-page lk-manual-page">
+  <div class="create-page-head">
+    <div><h1>Manual Posting</h1><p>Add your locksmith service details and up to 5 photos.</p></div>
+    <a href="{{ url_for('web.auto_listing_page') }}" class="create-back">Back to Create Listings</a>
+  </div>
+
+  <div class="form-box manual-listing-form-box create-form-panel">
+    <form id="manual-post-form" data-posting-timing method="POST" action="{{ url_for('web.auto_listing_manual') }}" enctype="multipart/form-data">
+      <input type="hidden" name="account" value="{{ active_account or '' }}">
+      <fieldset>
+        {% set prefill_data = prefill if prefill else {} %}
+        {% set prefilled_images = request.form.getlist('prefilled_images') if 'prefilled_images' in request.form else prefill_data.get('prefilled_images', []) %}
+        <label class="file-label">Photos (up to 5)</label>
+        {% if prefilled_images %}
+        <div class="manual-note" style="text-align:left; margin-top:4px;">
+          Previously selected images are included below. Uncheck any to remove.
+        </div>
+        <div class="manual-image-grid" style="margin-top: 10px;">
+          {% for img in prefilled_images %}
+          <div class="manual-image-slot" style="min-height:auto;">
+            <input type="checkbox" name="prefilled_images" value="{{ img }}" checked style="margin-bottom:8px;">
+            <img
+              src="{{ url_for('web.screenshot_file', filename=img) }}"
+              alt="Selected image {{ loop.index }}"
+              style="width:100%; height:120px; object-fit:cover; border-radius:0;"
+            >
+            <div class="manual-image-name" style="margin-top:6px; font-size:12px;">{{ img }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="manual-image-grid lk-photo-grid">
+          {% for i in range(1, 6) %}
+          <div class="manual-image-slot">
+            <input
+              id="image_slot_{{ i }}"
+              type="file"
+              name="images"
+              accept="image/*"
+              class="manual-image-input"
+              data-slot="{{ i }}"
+              {% if i == 1 and not prefilled_images %}required{% endif %}
+            >
+            <label for="image_slot_{{ i }}" class="manual-image-label">
+              <span class="manual-image-plus">+</span>
+              <span class="manual-image-text">Photo {{ i }}</span>
+            </label>
+            <div class="manual-image-name" id="image_slot_name_{{ i }}">No file chosen</div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="lk-fields">
+          <div class="lk-field-col">
+            <label for="title" class="file-label">Service title</label>
+            <input id="title" name="title" type="text" class="input-field" maxlength="200" required placeholder="e.g. 24/7 Emergency Lockout Service" value="{{ request.form.get('title', prefill_data.get('title', '')) }}">
+
+            <label for="price" class="file-label">Starting price</label>
+            <input id="price" name="price" type="number" min="0" step="1" class="input-field" required placeholder="e.g. 49" value="{{ request.form.get('price', prefill_data.get('price', '')) }}">
+
+            <label for="location" class="file-label">Location (optional)</label>
+            <input id="location" name="location" type="text" class="input-field" maxlength="120" placeholder="e.g. Dallas, Texas — leave empty to keep Facebook's location" value="{{ request.form.get('location', prefill_data.get('location', '')) }}">
+          </div>
+          <div class="lk-field-col">
+            <label for="description" class="file-label">Service description</label>
+            <textarea id="description" name="description" rows="5" class="input-field" placeholder="Services offered (lockouts, rekeying, lock installs, car keys), service area, hours, phone number...">{{ request.form.get('description', prefill_data.get('description', '')) }}</textarea>
+          </div>
+        </div>
+
+        <p class="manual-note">The service ad will be posted to the active Facebook account.</p>
+        <div class="manual-actions">
+          <button type="button" id="manual-group-trigger" data-posting-timing-form="manual-post-form" class="manual-action-button">Post</button>
+          <button type="button" id="manual-save-template" class="manual-action-button manual-action-secondary" disabled>Save template</button>
+          <button type="button" id="manual-account-trigger" class="manual-action-button" disabled>Accounts Post</button>
+        </div>
+        <input type="hidden" id="multi-account-hidden" name="multi_account" value="0">
+        <div id="manual-group-hidden" hidden></div>
+      </fieldset>
+    </form>
+    <div
+      id="manual-group-modal"
+      class="manual-group-modal"
+      data-max="20"
+      data-open="{% if request.form.get('post_action') == 'group' %}1{% else %}0{% endif %}"
+    >
+      <div class="manual-group-backdrop" data-close="1"></div>
+      <div class="manual-group-dialog" role="dialog" aria-modal="true" aria-labelledby="manual-group-title">
+        <div class="manual-group-accent"></div>
+        <div class="manual-group-dialog-head">
+          <div>
+            <span class="manual-group-eyebrow">POST DESTINATION</span>
+            <h4 id="manual-group-title">Choose groups</h4>
+            <p class="manual-note">Select groups for this post, or skip group posting to publish only to Marketplace.</p>
+          </div>
+          <div class="manual-group-count">
+            <span id="manual-groups-count">0</span>/20 selected
+          </div>
+          <button type="button" class="manual-group-close" aria-label="Close" data-close="1">X</button>
+        </div>
+        <div class="manual-group-dialog-body">
+          <div id="manual-group-limit" class="manual-group-limit" style="display:none;">
+            You can select up to 20 groups.
+          </div>
+          <div id="manual-groups-list" class="manual-group-list">
+            {% set selected_groups = request.form.getlist('group_ids') %}
+            {% if groups %}
+              {% for g in groups %}
+                <label class="manual-group-item">
+                  <input
+                    type="checkbox"
+                    value="{{ g.id }}"
+                    {% if g.id in selected_groups %}checked{% endif %}
+                  >
+                  <span class="manual-group-text">
+                    <span class="manual-group-name">{{ g.name }}</span>
+                    <span class="manual-group-meta">
+                      {% if g.member_count_label %}{{ g.member_count_label }}{% else %}Members hidden{% endif %}
+                      {% if g.privacy %} · {{ g.privacy }}{% endif %}
+                    </span>
+                  </span>
+                </label>
+              {% endfor %}
+            {% else %}
+              <div class="manual-group-empty">No groups found for this account.</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="manual-group-actions">
+          <button type="button" id="manual-group-skip" data-posting-timing-form="manual-post-form" class="manual-action-button manual-action-secondary">Skip and Post</button>
+          <button type="button" id="manual-group-submit" data-posting-timing-form="manual-post-form" class="manual-action-button">Post</button>
+        </div>
+      </div>
+    </div>
+    <div id="manual-account-modal" class="manual-group-modal" hidden>
+      <div class="manual-group-backdrop" data-account-close="1"></div>
+      <div class="manual-group-dialog" role="dialog" aria-modal="true" aria-labelledby="manual-account-title">
+        <div class="manual-group-dialog-head">
+          <div><h4 id="manual-account-title">Select accounts</h4><p class="manual-note">The post will be scheduled separately for each selected account.</p></div>
+          <button type="button" class="manual-group-close" aria-label="Close" data-account-close="1">X</button>
+        </div>
+        <div class="manual-group-dialog-body">
+          <label style="display:block; margin-bottom:8px;"><input id="manual-account-select-all" type="checkbox"> Select all accounts</label>
+          {% for account in accounts %}
+          <label style="display:block; margin:6px 0;"><input class="manual-account-check" type="checkbox" name="target_accounts" value="{{ account }}"> {{ account }}</label>
+          {% endfor %}
+        </div>
+        <div class="manual-group-actions"><button type="button" id="manual-account-submit" data-posting-timing-form="manual-post-form" class="manual-action-button">Post to Accounts</button><button type="button" class="manual-action-button manual-action-secondary" data-account-close="1">Cancel</button></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  (function () {
+    const unitInput = document.getElementById("delay_unit");
+    const valueInput = document.getElementById("delay_value");
+    const timing = document.getElementById('manual_timing');
+    const delayFields = document.getElementById('manual-delay-fields');
+    function syncTiming() {
+      const later = timing && timing.value === 'schedule';
+      if (delayFields) delayFields.hidden = !later;
+      [unitInput, valueInput].forEach(input => { if (input) { input.required = later; input.disabled = !later; } });
+    }
+    if (timing) timing.addEventListener('change', syncTiming);
+    syncTiming();
+    const saveTemplate = document.getElementById('manual-save-template');
+    if (saveTemplate) saveTemplate.addEventListener('click', () => {
+      const form = saveTemplate.closest('form');
+      [unitInput, valueInput].forEach(input => { if (input) { input.required = false; input.disabled = true; } });
+      if (!form.reportValidity()) { syncTiming(); return; }
+      const action = document.createElement('input');
+      action.type = 'hidden'; action.name = 'submit_action'; action.value = 'save_template';
+      form.appendChild(action);
+      saveTemplate.disabled = true; saveTemplate.textContent = 'Saving...';
+      form.submit();
+    });
+    const accountTrigger = document.getElementById("manual-account-trigger");
+    const accountModal = document.getElementById("manual-account-modal");
+    const accountSubmit = document.getElementById("manual-account-submit");
+    const accountSelectAll = document.getElementById("manual-account-select-all");
+    const accountChecks = Array.from(document.querySelectorAll(".manual-account-check"));
+    const accountHidden = document.getElementById("multi-account-hidden");
+    const vehicleTypeInput = document.getElementById("vehicle_type");
+    const bodyStyleField = document.getElementById("body-style-field");
+    const bodyStyleInput = document.getElementById("body_style");
+
+    function syncBodyStyleRequirement() {
+      const isCar = vehicleTypeInput && vehicleTypeInput.value.toLowerCase() === "car";
+      if (bodyStyleField) bodyStyleField.style.display = isCar ? "" : "none";
+      if (bodyStyleInput) {
+        bodyStyleInput.disabled = !isCar;
+        bodyStyleInput.required = isCar;
+      }
+    }
+
+    if (vehicleTypeInput) vehicleTypeInput.addEventListener("change", syncBodyStyleRequirement);
+    syncBodyStyleRequirement();
+
+    function updateAccountSelectAll() {
+      if (!accountSelectAll) return;
+      accountSelectAll.checked = accountChecks.length > 0 && accountChecks.every((box) => box.checked);
+    }
+    function openAccountModal() {
+      if (accountModal) { accountModal.hidden = false; accountModal.classList.add("is-open"); updateAccountSelectAll(); }
+    }
+    function closeAccountModal() {
+      if (accountModal) { accountModal.classList.remove("is-open"); accountModal.hidden = true; }
+    }
+    if (accountTrigger) {
+      accountTrigger.addEventListener("click", function () {
+        const form = accountTrigger.closest("form");
+        if (form && !form.checkValidity()) { form.reportValidity(); return; }
+        openAccountModal();
+      });
+    }
+    if (accountSelectAll) accountSelectAll.addEventListener("change", function () {
+      accountChecks.forEach((box) => { box.checked = accountSelectAll.checked; });
+    });
+    accountChecks.forEach((box) => box.addEventListener("change", updateAccountSelectAll));
+    if (accountModal) accountModal.addEventListener("click", function (event) {
+      if (event.target && event.target.dataset && event.target.dataset.accountClose === "1") closeAccountModal();
+    });
+    if (accountSubmit) accountSubmit.addEventListener("click", function () {
+      const form = accountTrigger ? accountTrigger.closest("form") : null;
+      const selected = accountChecks.filter((box) => box.checked);
+      if (!selected.length) { alert("Select at least one account."); return; }
+      if (accountHidden) {
+        accountHidden.value = "1";
+        selected.forEach((box) => {
+          const input = document.createElement("input");
+          input.type = "hidden"; input.name = "target_accounts"; input.value = box.value;
+          accountHidden.parentNode.appendChild(input);
+        });
+      }
+      if (form) form.submit();
+    });
+
+    function applyRange() {
+      const unit = unitInput.value;
+      if (unit === "hours") {
+        valueInput.min = "1";
+        valueInput.removeAttribute("max");
+        valueInput.placeholder = ">= 1";
+      } else if (unit === "minutes") {
+        valueInput.min = "1";
+        valueInput.removeAttribute("max");
+        valueInput.placeholder = ">= 1";
+      } else {
+        valueInput.min = "1";
+        valueInput.removeAttribute("max");
+        valueInput.placeholder = "";
+      }
+    }
+
+    if (unitInput && valueInput) { unitInput.addEventListener("change", applyRange); applyRange(); }
+
+    const imageInputs = Array.from(document.querySelectorAll(".manual-image-input"));
+    imageInputs.forEach((input) => {
+      input.addEventListener("change", function () {
+        const slot = this.getAttribute("data-slot");
+        const nameBox = document.getElementById("image_slot_name_" + slot);
+        if (!nameBox) return;
+        const file = this.files && this.files[0] ? this.files[0] : null;
+        nameBox.textContent = file ? file.name : "No file chosen";
+        const slotBox = this.closest('.manual-image-slot');
+        let remove = slotBox.querySelector('[data-remove-media]');
+        if (!remove) {
+          remove = document.createElement('button');
+          remove.type = 'button';
+          remove.dataset.removeMedia = 'true';
+          remove.textContent = 'Remove';
+          remove.addEventListener('click', () => {
+            this.value = '';
+            this.dispatchEvent(new Event('change', {bubbles: true}));
+          });
+          slotBox.appendChild(remove);
+        }
+        remove.hidden = !file;
+        const oldPreview = slotBox.querySelector('[data-media-preview]');
+        if (oldPreview) {
+          URL.revokeObjectURL(oldPreview.src);
+          oldPreview.remove();
+        }
+        if (file) {
+          const preview = document.createElement('img');
+          preview.dataset.mediaPreview = 'true';
+          preview.src = URL.createObjectURL(file);
+          preview.style.cssText = 'width:100%;height:100px;object-fit:contain';
+          preview.alt = file.name;
+          slotBox.appendChild(preview);
+        }
+      });
+    });
+
+    const groupTrigger = document.getElementById("manual-group-trigger");
+    const groupModal = document.getElementById("manual-group-modal");
+    const groupList = document.getElementById("manual-groups-list");
+    const groupCount = document.getElementById("manual-groups-count");
+    const groupLimit = document.getElementById("manual-group-limit");
+    const groupSubmit = document.getElementById("manual-group-submit");
+    const groupSkip = document.getElementById("manual-group-skip");
+    const groupHidden = document.getElementById("manual-group-hidden");
+    const groupMax = groupModal ? parseInt(groupModal.getAttribute("data-max") || "20", 10) : 20;
+
+    function setGroupLimitMessage(show) {
+      if (!groupLimit) return;
+      groupLimit.style.display = show ? "block" : "none";
+    }
+
+    function updateGroupLimit() {
+      if (!groupList || !groupCount) return;
+      const boxes = Array.from(groupList.querySelectorAll("input[type='checkbox']"));
+      const checkedCount = boxes.filter((box) => box.checked).length;
+      groupCount.textContent = String(checkedCount);
+      const limitReached = checkedCount >= groupMax;
+      boxes.forEach((box) => {
+        if (!box.checked) {
+          box.disabled = limitReached;
+        }
+      });
+      setGroupLimitMessage(limitReached);
+    }
+
+    function openGroupModal() {
+      if (!groupModal) return;
+      groupModal.classList.add("is-open");
+      updateGroupLimit();
+    }
+
+    function closeGroupModal() {
+      if (!groupModal) return;
+      groupModal.classList.remove("is-open");
+      setGroupLimitMessage(false);
+    }
+
+    function syncHiddenGroupInputs() {
+      if (!groupHidden) return;
+      groupHidden.innerHTML = "";
+      const actionInput = document.createElement("input");
+      actionInput.type = "hidden";
+      actionInput.name = "post_action";
+      actionInput.value = "simple";
+      groupHidden.appendChild(actionInput);
+
+      if (!groupList) return;
+      const checked = Array.from(groupList.querySelectorAll("input[type='checkbox']:checked"));
+      checked.forEach((box) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "group_ids";
+        input.value = box.value;
+        groupHidden.appendChild(input);
+      });
+    }
+
+    if (groupTrigger) groupTrigger.addEventListener("click", function () {
+      const form = groupTrigger.closest("form");
+      if (form && !form.checkValidity()) { form.reportValidity(); return; }
+      openGroupModal();
+    });
+
+    function submitManualPost(skipGroups) {
+      const form = groupTrigger ? groupTrigger.closest("form") : null;
+      if (!form) return;
+      if (!form.checkValidity()) { form.reportValidity(); return; }
+      syncHiddenGroupInputs();
+      if (skipGroups && groupHidden) {
+        groupHidden.querySelectorAll("input[name='group_ids']").forEach(input => input.remove());
+      }
+      const action = groupHidden && groupHidden.querySelector("input[name='post_action']");
+      if (action) action.value = skipGroups ? "simple" : "group";
+      form.submit();
+    }
+
+    if (groupSubmit) groupSubmit.addEventListener("click", () => submitManualPost(false));
+    if (groupSkip) groupSkip.addEventListener("click", () => submitManualPost(true));
+
+    if (groupModal) {
+      groupModal.addEventListener("click", function (event) {
+        const target = event.target;
+        if (target && target.dataset && target.dataset.close === "1") {
+          closeGroupModal();
+        }
+      });
+    }
+
+    if (groupList) {
+      groupList.querySelectorAll("input[type='checkbox']").forEach((box) => {
+        box.addEventListener("change", updateGroupLimit);
+      });
+      updateGroupLimit();
+    }
+  })();
+</script>
+{% endblock %}

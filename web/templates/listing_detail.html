@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% from '_listing_storage_badges.html' import storage_badges %}
+{% block title %}Listing details{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/listing_detail.css') }}"><style>
+.ld-edit-photos{margin-top:18px}.ld-edit-photos h3{margin:0}
+.ld-edit-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:10px}
+.ld-edit-photo,.ld-edit-photo-add{position:relative;height:110px;box-sizing:border-box}
+.ld-edit-photo img{width:100%;height:100%;object-fit:cover;background:#eef2f7;display:block}
+.ld-edit-photo.is-new{outline:2px solid #2e9d5b;outline-offset:-2px}
+.ld-edit-photo.is-removed img{opacity:.25}
+.ld-edit-photo-remove{position:absolute;top:4px;right:4px;width:26px;height:26px;border:0;border-radius:50%;background:rgba(17,24,39,.8);color:#fff;font-size:17px;line-height:1;cursor:pointer}
+.ld-edit-photo.is-removed .ld-edit-photo-remove{background:#2e9d5b}
+.ld-edit-photo-add{display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #c3cbd6;color:#5b6676;font-size:13px;font-weight:700;cursor:pointer}
+.ld-edit-photo-add span{font-size:26px;line-height:1}.ld-edit-photo-add:hover{border-color:#1c2733;color:#1c2733}
+</style>{% endblock %}
+{% block content %}
+{% set source = listing.details|default({}, true) %}
+{% set photos = listing.downloaded_images|default([], true) %}
+{% set labels = {'queued':'Queued','pending':'Scheduled','reading':'Preparing post','posting':'Posting','deleting':'Deleting listing','done':'Posted','failed':'Post failed','facebook_deleting':'Deleting from Facebook'} %}
+{% set backup_record = listing.facebook_present is sameas false or (listing.source_deleted and not listing.facebook_reposted) %}
+{% set ad_backup = backup_record %}
+<div class="listing-detail" data-account="{{ active_account }}" data-listing-id="{{ listing.id }}" data-save-url="{{ url_for('web.listing_detail', listing_id=listing.id) }}" data-cross-url="{{ url_for('web.cross_post_listing') }}" data-delete-url="{{ url_for('web.delete_listings_delete') }}" data-listings-url="{{ url_for('web.backup_listings_page' if backup_record else 'web.delete_listings_page') }}" data-status-url="{{ url_for('web.delete_listings_data') }}" data-image-order='{{ photos|map(attribute="name")|list|tojson }}' data-ad-fields='{{ {"title":source.title or "", "price":source.price or listing.price or "", "location":source.location or "", "description":source.description or ""}|tojson }}'>
+  <nav class="ld-navigation" aria-label="Listing navigation"><a class="ld-back" href="{{ url_for('web.backup_listings_page' if backup_record else 'web.delete_listings_page') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14"/></svg><span>{{ 'Backup Posts' if backup_record else 'Facebook listings' }}</span></a><span class="ld-navigation-label">{{ 'Backup Posts' if backup_record else 'Manage listings' }} / Details</span></nav>
+  <header class="ld-header">
+    <div class="ld-title-block"><span class="ld-eyebrow">MARKETPLACE AD</span><h1>{{ source.title or 'Untitled listing' }}</h1>
+      <div class="ld-meta"><strong>{{ source.price or listing.price or 'Price unavailable' }}</strong>{% if not backup_record %}<span>{{ listing.clicks|default(0) }} clicks</span>{% endif %}<span>{{ ('Listed on ' ~ listing.listed_date) if listing.listed_date else 'Date unavailable' }}</span></div>
+      {{ storage_badges(listing, detail=true) }}
+    </div>
+    <div class="ld-header-actions">{% if backup_record %}<button class="ld-btn ld-secondary" type="button" data-backup-edit-open {% if busy %}disabled{% endif %}>Edit backup</button>{% endif %}<span id="listing-status" class="ld-badge" {% if not labels.get(repost_status) %}hidden{% endif %}>{{ labels.get(repost_status, '') }}</span><button class="ld-btn ld-delete" id="start-delete" type="button" aria-expanded="false" aria-controls="delete-options" {% if busy or ad_backup %}disabled{% endif %} {% if ad_backup %}hidden{% endif %}>Delete listing</button><button class="ld-btn ld-primary" id="start-cross-post" type="button" data-ad-backup="{{ 'true' if ad_backup else 'false' }}" {% if busy or not source or not photos or accounts|length < 2 %}disabled{% endif %}>Post on Other accounts</button></div>
+  </header>
+  <section id="delete-options" class="ld-panel ld-delete-options" hidden aria-labelledby="delete-options-title" {% if ad_backup %}hidden{% endif %}>
+    <div class="ld-section-heading"><h2 id="delete-options-title">Where should this listing be deleted?</h2><button id="cancel-delete" class="ld-btn ld-secondary" type="button">Cancel</button></div>
+    <div class="ld-delete-choices">
+      <button type="button" data-delete-target="facebook"><strong>Delete from Facebook</strong><span>Keep the saved details and photos as a backup.</span></button>
+      <button type="button" data-delete-target="database"><strong>Delete from database</strong><span>Remove the saved listing. Leave Facebook unchanged.</span></button>
+      <button type="button" data-delete-target="both"><strong>Delete both</strong><span>Delete from Facebook, then remove the saved listing.</span></button>
+    </div>
+  </section>
+  <p id="workflow-status" class="ld-feedback" role="status" aria-live="polite"></p>
+  {% if listing.detail_error or listing.image_errors %}
+  <div class="ld-notice" role="alert"><strong>Import needs attention</strong><p>{{ listing.detail_error or 'Some photos could not be saved. Import listings again to retry.' }}</p>
+    {% if listing.image_errors %}<details><summary>{{ listing.image_errors|length }} photo download issue(s)</summary><ul>{% for error in listing.image_errors %}<li>{{ error }}</li>{% endfor %}</ul></details>{% endif %}
+  </div>
+  {% endif %}
+  {% if listing.repost_error %}<div class="ld-notice"><strong>Last repost could not finish</strong><p>{{ listing.repost_error }}</p></div>{% endif %}
+  {% if busy %}<p class="ld-note">A listing operation is active. You can view the details while it finishes.</p>{% endif %}
+  {% if listing.downloaded_videos %}
+  <section class="ld-panel" aria-label="Saved listing videos">
+    <h2>Saved videos</h2>
+    <p class="ld-note">Included when reposting or posting to other accounts if Facebook supports video uploads.</p>
+    {% for video in listing.downloaded_videos %}
+    <video class="ld-saved-video" controls preload="metadata" playsinline src="{{ url_for('web.listing_video', listing_id=listing.id, name=video.name) }}">Your browser cannot play this video.</video>
+    {% endfor %}
+  </section>
+  {% endif %}
+  {% if listing.video_errors %}<p class="ld-note">Some optional videos could not be backed up. Photos and listing details remain available.</p>{% endif %}
+  {% if backup_record %}{% include "_backup_edit.html" %}{% endif %}
+  <div id="listing-read-view" class="ld-layout">
+    <section class="ld-panel ld-gallery"><div class="ld-section-heading"><h2>Photos</h2><span>{{ photos|length }} saved</span></div>
+      {% if photos %}
+      <img id="listing-hero" class="ld-hero" src="{{ url_for('web.listing_photo', listing_id=listing.id, name=photos[0].name) }}" alt="{{ source.title or 'Listing photo' }}">
+      <div class="ld-thumbnails">{% for photo in photos %}<button class="ld-thumbnail{% if loop.first %} is-active{% endif %}" type="button" data-preview="{{ url_for('web.listing_photo', listing_id=listing.id, name=photo.name) }}" aria-label="View photo {{ loop.index }}"><img src="{{ url_for('web.listing_photo', listing_id=listing.id, name=photo.name) }}" alt="Photo {{ loop.index }}" loading="lazy"></button>{% endfor %}</div>
+      <p class="ld-note">Original downloaded photos &middot; {{ photos[0].width }} &times; {{ photos[0].height }} pixels</p>
+      {% else %}<div class="ld-photo-empty">No saved photos yet.<br>Import listings to download them.</div>{% endif %}
+    </section>
+    <section class="ld-panel ld-information"><div class="ld-section-heading"><h2>Marketplace ad information</h2><button id="edit-listing" class="ld-btn ld-secondary" type="button" {% if busy %}disabled{% endif %}>Edit details</button></div>
+      <dl class="ld-info-grid">{% for field in fields if field not in ['title','description'] %}
+      {% set state = source.get('field_states', {}).get(field) %}
+      <div><dt>{{ field|replace('_',' ')|title }}</dt><dd>{% if source.get(field) %}{{ source.get(field) }}{% elif state == 'unavailable' %}<span class="ld-unset">Could not read from Facebook</span>{% elif state == 'empty' %}<span class="ld-unset">Empty on Facebook</span>{% elif state == 'disabled' %}<span class="ld-unset">Disabled on Facebook</span>{% else %}<span class="ld-unset">Not imported</span>{% endif %}</dd></div>
+      {% endfor %}</dl>
+      <div class="ld-description"><h3>Description</h3><p>{{ source.description or ('Empty on Facebook' if source.get('field_states', {}).get('description') == 'empty' else 'No description imported') }}</p></div>
+    </section>
+  </div>
+  <form id="listing-edit-form" class="ld-panel" hidden>
+    <div class="ld-section-heading"><h2>Edit saved listing details</h2><button id="cancel-edit-listing" class="ld-btn ld-secondary" type="button">Cancel</button></div>
+    <p class="ld-note">Save missing or changed details here before posting. These changes update the app's saved listing.</p>
+    <div class="ld-edit-grid">
+    {% for field in fields %}{% set value = source.get(field, '') or '' %}
+      <label class="ld-field{% if field == 'description' %} ld-wide{% endif %}"><span>{{ field|replace('_',' ')|title }}</span>
+      {% if field == 'description' %}<textarea name="{{ field }}" rows="5">{{ value }}</textarea>
+      {% elif field in ['exterior_color', 'interior_color'] %}<select name="{{ field }}">{{ color_options(value) }}</select>
+      {% else %}<input name="{{ field }}" value="{{ value }}">{% endif %}</label>
+    {% endfor %}
+    </div>
+    <div class="ld-edit-photos" data-photos-url="{{ url_for('web.listing_detail_photos', listing_id=listing.id) }}">
+      <div class="ld-section-heading"><h3>Photos</h3><span id="ld-edit-photo-count"></span></div>
+      <p class="ld-note">Click &times; to remove a photo. Add new JPEG, PNG, WebP, GIF or BMP photos (up to 20 photos, 20 MB each).</p>
+      <div class="ld-edit-photo-grid">
+        {% for photo in photos %}<div class="ld-edit-photo" data-photo-name="{{ photo.name }}"><img src="{{ url_for('web.listing_photo', listing_id=listing.id, name=photo.name) }}" alt="Photo {{ loop.index }}" loading="lazy"><button type="button" class="ld-edit-photo-remove" data-remove-photo aria-label="Remove photo {{ loop.index }}">&times;</button></div>{% endfor %}
+        <label class="ld-edit-photo-add"><input type="file" id="ld-edit-photo-input" accept="image/jpeg,image/png,image/webp,image/gif,image/bmp" multiple hidden><span>+</span>Add photos</label>
+      </div>
+    </div>
+    <div class="ld-submit-row"><button class="ld-btn ld-primary" type="submit">Save details</button></div>
+  </form>
+  <dialog id="ad-cross-dialog" class="ld-cross-dialog">
+    <form method="dialog" class="ld-cross-dialog-head"><div><span class="ld-eyebrow">SERVICE AD POSTING</span><h2>Choose accounts</h2><p>Select where this service ad should be posted.</p></div><button class="ld-btn ld-secondary" aria-label="Close">×</button></form>
+    <div class="ld-cross-account-list">{% for account in accounts if account != active_account %}<label><input type="checkbox" value="{{ account }}"> <span>{{ account }}</span></label>{% endfor %}</div>
+    <p id="ad-cross-message" class="ld-feedback" role="status" aria-live="polite"></p>
+    <div class="ld-cross-dialog-actions"><button type="button" class="ld-btn ld-secondary" data-cross-cancel>Cancel</button><button type="button" class="ld-btn ld-primary" id="ad-cross-submit">Post ad</button></div>
+  </dialog>
+</div>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/listing_detail.js') }}" defer></script>{% endblock %}

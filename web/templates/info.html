@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Help & Instructions{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">{% endblock %}
+{% block content %}
+<main class="settings-page">
+  <a class="guide-back" href="{{ url_for('web.settings_page') }}">&larr; Back to Settings</a>
+  <div class="settings-heading"><span class="settings-eyebrow">USER GUIDE</span><h1>HELP &amp; INSTRUCTIONS</h1><p>Choose a topic below. Each guide explains where to go and what to do.</p></div>
+  <section class="guide-start"><h2>START HERE</h2><ol><li>Open <strong>Settings &rarr; Accounts</strong>. Add a Facebook account and finish signing in in the browser window.</li><li>Choose that account in <strong>Active Account</strong> at the top. Check this before starting a task.</li><li>Choose a task in the sidebar. Keep the app running while a task is working or waiting for its scheduled time.</li></ol></section>
+  <section class="guide-controls" aria-label="Guide controls">
+    <div class="guide-search"><label for="guide-search">FIND AN ANSWER</label><input id="guide-search" type="search" placeholder="Search topics or steps, e.g. photos" autocomplete="off" aria-controls="guide-topics"></div>
+    <div class="guide-actions"><button type="button" id="guide-expand">EXPAND ALL</button><button type="button" id="guide-collapse">COLLAPSE ALL</button><button type="button" id="guide-reset">CLEAR SEARCH</button></div>
+  </section>
+  <p id="guide-results" class="guide-results" role="status" aria-live="polite"></p>
+  <p id="guide-empty" class="guide-empty" hidden>No topics match your search. Try another word or click CLEAR SEARCH.</p>
+  <nav class="guide-nav" aria-label="Instruction topics">{% for id, label in [('accounts','Accounts'),('dashboard','Dashboard'),('manual','Manual posting'),('manage','Manage listings'),('repost','Reposting'),('cross','Cross posting'),('schedules','Schedules'),('activity','Activity log'),('header','Header controls'),('cleanup','Cleanup'),('desktop','Background & Updates')] %}<a href="#{{ id }}">{{ label|upper }}</a>{% endfor %}</nav>
+  <div id="guide-topics">
+  <details class="guide-topic" id="accounts" open><summary>ACCOUNTS: ADD, CHECK, OR SIGN IN AGAIN</summary><div><ol><li>Open <strong>Settings &rarr; Accounts</strong>.</li><li>Enter an account title and click <strong>Open Facebook Login</strong>.</li><li>Sign in to Facebook in the window that opens. Complete any verification Facebook requests and wait for the app to save the login.</li><li>Choose the account from the top bar when you want to use it.</li><li>Use <strong>Check Login Cookies</strong> to check saved logins. If a login has expired, use <strong>Re-login</strong> and finish signing in again.</li></ol><p><strong>Delete</strong> removes an account from this app. It does not delete your Facebook account. Your portal login is separate from your Facebook login; <strong>Logout</strong> signs you out of the portal.</p></div></details>
+  <details class="guide-topic" id="dashboard"><summary>DASHBOARD: FIND A TASK QUICKLY</summary><div><p>Open <strong>Dashboard</strong> in the sidebar for shortcuts to posting, listings, accounts and history. Click a task to open its page.</p></div></details>
+  <details class="guide-topic" id="manual"><summary>CREATE ONE SERVICE AD MANUALLY</summary><div><ol><li>Open <strong>Create Listings &rarr; Manual Posting</strong>.</li><li>Fill in the service title, price, location, and description.</li><li>Add photos (up to 20), then click <strong>Post</strong>.</li><li>In the group window, select groups and click <strong>Post</strong>, or click <strong>Skip and Post</strong> to post only to Marketplace.</li><li>Open <strong>Posting Results</strong> to check the job.</li></ol></div></details>
+  <details class="guide-topic" id="manage"><summary>MANAGE LISTINGS: IMPORT, REVIEW, AND DELETE</summary><div><ol><li>Open <strong>Manage Listings</strong> and click <strong>Import Listings</strong>.</li><li>Wait while the app saves listing details and photos. Use <strong>Stop Import</strong> if you need to stop.</li><li>Search or select listings. Open a listing to review its details and saved photos.</li><li>Click <strong>Refresh Clicks</strong> to update listing click counts from Facebook.</li><li>To remove a listing, open it and click <strong>Delete listing</strong>. Choose <strong>Delete from Facebook</strong>, <strong>Delete from database</strong>, or <strong>Delete both</strong>.</li></ol><p>Deleting from Facebook removes the live post. Deleting from the database removes the app's saved backup. <strong>Clear All Listings</strong> clears saved app listings; it does not delete Facebook posts. For bulk Facebook deletion, select listings and use <strong>Delete from Facebook</strong>.</p></div></details>
+  <details class="guide-topic" id="repost"><summary>REPOST A SAVED LISTING</summary><div><ol><li>Import your listings in <strong>Manage Listings</strong>, then open the listing you want.</li><li>Click <strong>Repost listing</strong>.</li><li>Review or change the new listing's details. Arrange the photos; the first photo becomes the cover.</li><li>Choose to repost now or schedule it for later, then confirm the action.</li><li>Open <strong>Reposting Results</strong> to see its schedule, progress, and result.</li></ol><p>Reposting deletes the original Facebook listing first, then publishes the new one. Your saved backup is kept even if posting fails. Review the result before retrying. <strong>Clear history</strong> clears the repost history display.</p></div></details>
+  <details class="guide-topic" id="cross"><summary>CROSS POST TO OTHER FACEBOOK ACCOUNTS</summary><div><ol><li>Open a saved listing in <strong>Manage Listings</strong> and click <strong>Post on Other accounts</strong>.</li><li>Choose the other accounts that should receive the listing.</li><li>Review the details, photo order, and timing, then confirm cross posting.</li><li>Check <strong>Posting Results</strong> for the source or destination account. Cross posts run one at a time.</li></ol><p>Each destination account needs a working Facebook login.</p></div></details>
+  <details class="guide-topic" id="schedules"><summary>POSTING RESULTS AND REPOSTING RESULTS</summary><div><p>Open <strong>Posting Results</strong> in the sidebar to see queued posts, posting times, and statuses for the selected account. The table refreshes automatically. Use its delete action to remove a queue entry, and review the displayed status first.</p><p>Open <strong>Reposting Results</strong> for repost schedules and history. Keep the app running and your PC awake until jobs finish. In the installed desktop app, schedules are saved when you restart. Closing the window keeps the app running in its tray. If your PC is off or asleep, jobs wait until it is available again. Interrupted posts are marked for review so the app does not post them twice.</p></div></details>
+  <details class="guide-topic" id="activity"><summary>ACTIVITY LOG: CHECK WHAT HAPPENED</summary><div><p>Open <strong>Settings &rarr; Activity Log</strong> to read recent automation messages. If a task fails, check its message, confirm the account is signed in, and fix any missing details before retrying. Clearing the log removes saved activity messages.</p></div></details>
+  <details class="guide-topic" id="header"><summary>HEADER CONTROLS: ACCOUNT, BACKGROUND MODE, AND STORAGE</summary><div><ul><li><strong>Active Account:</strong> choose which Facebook account you want to work with.</li><li><strong>Background:</strong> Hidden runs supported automation without showing its Chrome window. Visible shows the browser. Login and verification may still need a visible window.</li><li><strong>Temp / Uploads:</strong> show the space used by screenshots and manually uploaded images/videos.</li><li><strong>Logout:</strong> sign out of the app's portal.</li><li>On a small screen, use the header arrow to collapse or expand the header.</li></ul></div></details>
+  <details class="guide-topic" id="cleanup"><summary>CLEAN UP: FREE SPACE AFTER POSTING</summary><div><ol><li>Wait until posting jobs have finished, including scheduled jobs that need uploaded photos.</li><li>Open <strong>Settings</strong> and find <strong>Clean Up</strong>.</li><li>Review the screenshot and upload sizes, then click <strong>Clean Up</strong>.</li></ol><p>This deletes saved screenshots and manually uploaded images/videos. It keeps accounts, listing backups, and Facebook posts. Cleanup is disabled while listing posts are running or queued for any account.</p></div></details>
+<details class="guide-topic" id="desktop"><summary>DESKTOP AND APP UPDATES</summary><div><ol><li>Open
+<strong>Settings</strong> to control <strong>Start With Windows</strong>.</li><li>Listing imports, click refreshes,
+and session checks run only when you start them. There are no daily imports, periodic click refreshes, automatic
+cookie checks, or catch-up tasks after your PC wakes.</li><li>Close the window to keep the app in the tray.
+Right-click its tray icon and choose <strong>Exit App</strong> to stop it.</li><li>When you are told
+an update is ready, open <strong>Settings</strong>, click <strong>Check for Updates</strong>, then <strong>Download
+&amp; Install</strong>. Finish any running automation first.</li></ol><p>Normal updates keep accounts, Facebook
+sessions and listings. An update that resets saved listings asks you before installing. Facebook may still
+occasionally require a fresh login.</p></div></details>
+  </div>
+</main>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function () {
+  const topics = Array.from(document.querySelectorAll('.guide-topic'));
+  const links = Array.from(document.querySelectorAll('.guide-nav a'));
+  const search = document.getElementById('guide-search');
+  const results = document.getElementById('guide-results');
+  const empty = document.getElementById('guide-empty');
+  function filterTopics() {
+    const query = search.value.trim().toLowerCase();
+    let count = 0;
+    topics.forEach(function(topic) {
+      const match = !query || topic.textContent.toLowerCase().includes(query);
+      topic.hidden = !match;
+      if (match) { count++; if (query) topic.open = true; }
+    });
+    links.forEach(function(link) { link.hidden = document.getElementById(link.hash.slice(1)).hidden; });
+    results.textContent = query ? count + ' matching topic' + (count === 1 ? '' : 's') : topics.length + ' topics ? select one to see its steps.';
+    empty.hidden = count !== 0;
+  }
+  function clearSearch() { search.value = ''; filterTopics(); }
+  function openGuideTopic() {
+    const topic = topics.find(function(item) { return '#' + item.id === window.location.hash; });
+    if (topic) { clearSearch(); topic.open = true; topic.scrollIntoView({block:'start'}); }
+  }
+  search.addEventListener('input', filterTopics);
+  document.getElementById('guide-expand').addEventListener('click', function() { topics.forEach(function(topic) { if (!topic.hidden) topic.open = true; }); });
+  document.getElementById('guide-collapse').addEventListener('click', function() { topics.forEach(function(topic) { topic.open = false; }); });
+  document.getElementById('guide-reset').addEventListener('click', function() { clearSearch(); search.focus(); });
+  links.forEach(function(link) { link.addEventListener('click', function() { document.getElementById(link.hash.slice(1)).open = true; }); });
+  window.addEventListener('hashchange', openGuideTopic);
+  filterTopics();
+  openGuideTopic();
+})();
+</script>
+{% endblock %}

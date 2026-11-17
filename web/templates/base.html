@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/logo.svg') }}">
+  <title>{% block title %}KeyPost Locksmith{% endblock %}</title>
+  <script src="{{ url_for('static', filename='js/app_requests.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/posting_timing.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  {% block extra_css %}{% endblock %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app_theme.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/branding.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-heading">
+      <span class="sidebar-heading-kicker">Main menu</span>
+      <strong>Daily tools</strong>
+    </div>
+    <ul class="menu">
+      <li class="{% if active_page == 'dashboard' %}active{% endif %}">
+        <div class="menu-link-wrap" onclick="window.location.href='/'">
+          <span class="menu-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+            </svg>
+          </span>
+          <a href="/">Dashboard</a>
+        </div>
+      </li>
+
+      <li class="{% if active_page == 'auto_listing' %}active{% endif %}">
+        <div class="menu-link-wrap" onclick="window.location.href='/auto_listing'">
+          <span class="menu-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M4 7h16v13H4z"></path>
+              <path d="M9 7V5h6v2"></path>
+              <path d="M10 13h4M12 11v4"></path>
+            </svg>
+          </span>
+          <a href="/auto_listing">Create Listings</a>
+        </div>
+      </li>
+
+      <li class="{% if active_page == 'extract_listings' %}active{% endif %}">
+        <div class="menu-link-wrap" onclick="window.location.href='{{ url_for('web.extract_listings_page') }}'">
+          <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="10.5" cy="10.5" r="6"></circle><path d="m15 15 5 5M10.5 7.5v6M7.5 10.5h6"></path></svg></span>
+          <a href="{{ url_for('web.extract_listings_page') }}">Extract Listings</a>
+        </div>
+      </li>
+
+      {% if active_account %}<li class="{% if active_page == 'backups' %}active{% endif %}">
+        <div class="menu-link-wrap" onclick="window.location.href='{{ url_for('web.backup_listings_page') }}'">
+          <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 7h16v13H4zM8 7V4h8v3M8 12h8M8 16h5"></path></svg></span>
+          <a href="{{ url_for('web.backup_listings_page') }}">Backup Posts</a>
+        </div>
+      </li>{% endif %}
+
+      {% if desktop_mode %}
+      <li class="{% if active_page == 'account_browser' %}active{% endif %}">
+        <div class="menu-link-wrap" onclick="window.location.href='{{ url_for('web.account_browser_page') }}'">
+          <span class="menu-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false"><rect x="2.5" y="4" width="19" height="16" rx="2"></rect><path d="M2.5 9h19M6 6.5h.01M9 6.5h.01M12 6.5h.01"></path></svg>
+          </span>
+          <a href="{{ url_for('web.account_browser_page') }}">Account Browser</a>
+        </div>
+      </li>
+
+      <li class="{% if active_page == 'manage_listings' %}active{% endif %}">
+        <div class="menu-link-wrap" onclick="window.location.href='{{ url_for('web.manage_listings_page') }}'">
+          <span class="menu-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false"><path d="M4 5h16v14H4z"></path><path d="M8 9h8M8 13h8M8 17h5"></path></svg>
+          </span>
+          <a href="{{ url_for('web.manage_listings_page') }}">Manage Listings</a>
+        </div>
+      </li>
+      {% endif %}
+
+
+
+
+
+      <li class="{% if active_page == 'schedule' %}active{% endif %}"><div class="menu-link-wrap" onclick="window.location.href='{{ url_for('web.post_schedular') }}'"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M7 3v4M17 3v4M3 10h18M8 14h3M8 17h6"></path></svg></span><a href="{{ url_for('web.post_schedular') }}">Posting Results</a></div></li>
+      <li class="{% if active_page == 'reposting' %}active{% endif %}"><div class="menu-link-wrap" onclick="window.location.href='{{ url_for('web.reposting_page') }}'"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 9M20 4v5h-5M20 12a8 8 0 0 1-13.7 5.6L4 15M4 20v-5h5"></path></svg></span><a href="{{ url_for('web.reposting_page') }}">Reposting Results</a></div></li>
+      <li class="{% if active_page in ['settings', 'account', 'groups', 'activity_log', 'info'] %}active{% endif %}"><div class="menu-link-wrap" onclick="window.location.href='{{ url_for('web.settings_page') }}'"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 7h16M4 17h16"></path><circle cx="9" cy="7" r="3"></circle><circle cx="15" cy="17" r="3"></circle></svg></span><a href="{{ url_for('web.settings_page') }}">Settings</a></div></li>
+    </ul>
+    <div class="sidebar-tip">
+      <span aria-hidden="true">i</span>
+      <p>Find accounts, cleanup and instructions in <strong>Settings</strong>.</p>
+    </div>
+  </aside>
+
+  <!-- Main Area -->
+  <div class="main">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-inner">
+        {% if active_page == 'account_browser' %}
+        <button type="button" class="account-browser-menu-toggle" id="browser-menu-toggle" aria-label="Show main menu" aria-expanded="false" title="Show main menu">
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+        {% endif %}
+        <div class="topbar-brand">
+          <a class="header-brand-link" href="{{ url_for('web.dashboard') }}" aria-label="KeyPost Locksmith dashboard"><span class="kp-brand"><img class="kp-brand-icon" src="{{ url_for('static', filename='img/logo.svg') }}" alt="" width="40" height="40"><span class="kp-brand-text"><strong>Key<em>Post</em></strong><small>Locksmith Automation</small></span></span></a>
+          <button
+            type="button"
+            class="mobile-header-toggle"
+            id="mobile-header-toggle"
+            aria-label="Collapse header"
+            aria-expanded="true"
+            title="Collapse header"
+          >
+            <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+              <path d="M4 7h16M4 17h16"></path>
+              <rect x="7" y="4" width="4" height="6"></rect>
+              <rect x="13" y="14" width="4" height="6"></rect>
+            </svg>
+          </button>
+        </div>
+
+        {% if active_page == 'account_browser' %}
+        <div class="account-browser-header" role="group" aria-label="Account Browser controls">
+          <label for="browser-account">Facebook account</label>
+          <select id="browser-account" aria-label="Facebook account" {% if not accounts %}disabled{% endif %}>
+            {% for account in accounts %}<option value="{{ account }}" {% if account == browser_state.account or (not browser_state.account and account == active_account) %}selected{% endif %}>{{ account }}</option>{% endfor %}
+          </select>
+          <button type="button" class="browser-primary" id="browser-open" {% if not accounts %}disabled{% endif %}>Open account</button>
+          <button type="button" class="browser-secondary" id="browser-stop" {% if not browser_state.open %}disabled{% endif %}>Stop</button>
+          <span class="account-browser-status" id="browser-status" role="status" aria-live="polite">{% if browser_state.open %}{{ browser_state.account }} is open{% else %}No account open{% endif %}</span>
+        </div>
+        {% else %}
+        <div class="accounts">
+          <div class="header-account-box">
+            <span class="header-account-label">Active Account</span>
+            <form method="post" action="{{ url_for('web.set_active_account') }}" class="header-account-form">
+              <select name="account" class="header-account-select" aria-label="Active Facebook account" onchange="this.form.submit()">
+                {% if not accounts %}<option value="" disabled selected>No saved accounts</option>{% endif %}
+                {% for acc in accounts %}
+                  <option value="{{ acc }}" {% if acc == active_account %}selected{% endif %}>
+                    {{ acc }}
+                  </option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+
+          <div class="header-utility-group" role="group" aria-label="Browser mode and saved file storage">
+            <div class="header-mode-box" title="When this is on, automation runs in invisible Chrome headless mode.">
+              <form
+                method="post"
+                action="{{ url_for('web.set_background_mode') }}"
+                class="header-mode-form"
+                data-ajax="true"
+              >
+                <span class="header-mode-title">Browser mode</span>
+                <label class="background-toggle">
+                  <input
+                    type="checkbox"
+                    name="run_in_background"
+                    value="1"
+                    class="background-toggle-input"
+                    aria-label="Run automation in the background"
+                    {% if run_in_background_enabled %}checked{% endif %}
+                  >
+                  <span class="background-toggle-slider" aria-hidden="true"></span>
+                  <span class="background-toggle-copy">
+                    <span class="background-toggle-state">
+                      {% if run_in_background_enabled %}
+                        Background
+                      {% else %}
+                        Visible browser
+                      {% endif %}
+                    </span>
+                  </span>
+                </label>
+                <span class="header-mode-message" role="status" hidden></span>
+              </form>
+            </div>
+
+            <div class="junk-pill" title="Total size of screenshot images saved by the app">
+              <span class="junk-label">Screenshots</span>
+              <span class="junk-value">{{ junk_files_size_label or "0 MB" }}</span>
+            </div>
+            <div class="junk-pill" title="Total size of manual uploaded images saved by the app">
+              <span class="junk-label">Uploads</span>
+              <span class="junk-value">{{ manual_pics_size_label or "0 MB" }}</span>
+            </div>
+
+          </div>
+        </div>
+        {% endif %}
+
+        {% block header_actions %}{% endblock %}
+
+        <div class="topbar-identity">
+          <a class="header-settings-link" href="{{ url_for('web.settings_page') }}" aria-label="Open settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><rect x="7" y="4" width="4" height="6"/><rect x="13" y="14" width="4" height="6"/></svg></a>
+          <a href="{{ url_for('web.portal_logout') }}" class="header-signout" title="Sign out of the portal"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H4v16h6M10 12h10M16 8l4 4-4 4"/></svg><span>Sign out</span></a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <section class="content">
+      {% block content %}{% endblock %}
+    </section>
+
+  </div>
+</div>
+{% if message and not suppress_base_message %}
+<div class="message-box" role="status" aria-live="polite">
+  <span class="close-msg" onclick="this.parentElement.style.display='none'">&times;</span>
+
+  <div class="
+    {% if message_type == 'success' %}message-success
+    {% elif message_type == 'failed' %}message-failed
+    {% else %}message-loading{% endif %}
+  ">
+    {{ message }}
+  </div>
+</div>
+{% endif %}
+<!-- Loading overlay -->
+<div id="loading-overlay">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text"></div>
+  </div>
+</div>
+<script>
+  document.querySelectorAll(".message-box").forEach(function(messageBox) {
+    window.setTimeout(function() {
+      messageBox.style.display = "none";
+    }, 7000);
+  });
+
+  document.querySelectorAll("[data-password-toggle]").forEach(function(toggle) {
+    toggle.addEventListener("click", function() {
+      const input = document.getElementById(toggle.dataset.passwordToggle);
+      if (!input) return;
+      const showing = input.type === "text";
+      input.type = showing ? "password" : "text";
+      toggle.setAttribute("aria-pressed", String(!showing));
+      toggle.setAttribute("aria-label", (showing ? "Show " : "Hide ") + (input.name === "messenger_pin" ? "Messenger PIN" : "password"));
+    });
+  });
+
+  (function() {
+    const toggle = document.getElementById("mobile-header-toggle");
+    const topbar = document.querySelector(".topbar");
+    if (!toggle) {
+      return;
+    }
+
+    const body = document.body;
+    const storageKey = "fbAutomationMobileHeaderCollapsed";
+
+    function applyCollapsedState(collapsed) {
+      body.classList.toggle("mobile-header-collapsed", collapsed);
+      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      toggle.setAttribute("aria-label", collapsed ? "Expand header" : "Collapse header");
+      toggle.setAttribute("title", collapsed ? "Expand header" : "Collapse header");
+      requestAnimationFrame(syncMobileTopbarHeight);
+    }
+
+    function syncMobileTopbarHeight() {
+      if (!topbar) {
+        return;
+      }
+      const height = Math.ceil(topbar.getBoundingClientRect().height);
+      document.documentElement.style.setProperty("--mobile-topbar-height", height + "px");
+    }
+
+    try {
+      applyCollapsedState(window.localStorage.getItem(storageKey) === "1");
+    } catch (error) {
+      applyCollapsedState(false);
+    }
+
+    syncMobileTopbarHeight();
+
+    toggle.addEventListener("click", function() {
+      const collapsed = !body.classList.contains("mobile-header-collapsed");
+      applyCollapsedState(collapsed);
+      try {
+        window.localStorage.setItem(storageKey, collapsed ? "1" : "0");
+      } catch (error) {
+      }
+    });
+
+    window.addEventListener("resize", syncMobileTopbarHeight);
+    window.addEventListener("load", syncMobileTopbarHeight);
+  })();
+
+  document.querySelectorAll("form").forEach(function(form) {
+    if ((form.getAttribute("data-ajax") || "").toLowerCase() === "true") {
+      return;
+    }
+    form.addEventListener("submit", function(event) {
+      if (event.defaultPrevented) return;
+      event.preventDefault(); // stop immediate submission
+      const overlay = document.getElementById("loading-overlay");
+      const overlayText = document.getElementById("loading-text");
+      const customText = form.getAttribute("data-overlay-text") || "";
+      overlay.style.display = "flex";
+      if (overlayText) {
+        overlayText.textContent = customText;
+        overlayText.style.display = customText ? "block" : "none";
+      }
+
+      const keep = (form.getAttribute("data-keep-overlay") || "").toLowerCase() === "true";
+      if (!keep) {
+        setTimeout(function() {
+          overlay.style.display = "none";
+        }, 4000);
+      }
+
+      // Wait until next repaint
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          form.submit();
+        });
+      });
+    });
+  });
+</script>
+<script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
+<script src="{{ url_for('static', filename='js/browser_mode.js') }}"></script>
+{% block extra_js %}{% endblock %}
+<script>
+(() => {
+  const list = document.querySelector('[data-active-task-list]');
+  if (!list) return;
+  const message = document.querySelector('[data-active-task-message]');
+  let loading = false, taskTimer = null;
+  async function refreshTasks() {
+    if (loading) return;
+    loading = true;
+    clearTimeout(taskTimer);
+    try {
+      const response = await appFetch('{{ url_for("web.active_browser_tasks") }}');
+      if (!response.ok) throw new Error('Could not load running actions.');
+      const data = await response.json();
+      list.replaceChildren();
+      if (!data.tasks.length) list.textContent = 'No running actions for this account.';
+      data.tasks.forEach(task => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #edf0f5';
+        const label = document.createElement('span');
+        label.textContent = task.action.replace(/^_/, '').replaceAll('_', ' ');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = task.cancel_requested ? 'Stopping…' : 'Cancel';
+        button.disabled = task.cancel_requested;
+        button.addEventListener('click', async () => {
+          button.disabled = true;
+          try {
+            const response = await appFetch('{{ url_for("web.cancel_browser_task") }}', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id:task.id})});
+            const result = await response.json();
+            message.textContent = result.message;
+          } catch (error) { message.textContent = 'Cancellation could not be requested. Try again.'; }
+          refreshTasks();
+        });
+        row.append(label, button); list.append(row);
+      });
+    } catch (error) { message.textContent = error.message; }
+    finally { loading = false; taskTimer = setTimeout(refreshTasks, 2000); }
+  }
+  refreshTasks();
+})();
+</script>
+</body>
+</html>

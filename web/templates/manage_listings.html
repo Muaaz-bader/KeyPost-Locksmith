@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Manage Listings{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/manage_listings.css') }}">{% endblock %}
+{% block header_actions %}
+<div class="ml-actions" id="ml-actions" role="group" aria-label="Delete listings" hidden>
+  <label class="ml-select-all" id="ml-select-all" hidden><input type="checkbox" id="ml-all"><span>Select all</span></label>
+  <button type="button" class="ml-delete ml-repost" id="ml-repost" disabled>
+    <span class="ml-spinner" aria-hidden="true"></span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 9M20 4v5h-5M20 12a8 8 0 0 1-13.7 5.6L4 15M4 20v-5h5"></path></svg>
+    <span id="ml-repost-label">Repost listings</span>
+  </button>
+  <button type="button" class="ml-delete" id="ml-delete" disabled>
+    <span class="ml-spinner" aria-hidden="true"></span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"></path></svg>
+    <span id="ml-delete-label">Delete listings</span>
+  </button>
+  <button type="button" class="ml-stop" id="ml-stop" hidden>Stop</button>
+</div>
+{% endblock %}
+{% block content %}
+<main class="manage-listings" aria-label="Marketplace listings" data-account="{{ active_account or '' }}">
+  <div class="manage-listings-surface" id="manage-surface">
+    <div class="manage-listings-placeholder" id="manage-placeholder">
+      <span class="manage-listings-placeholder-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"></path><path d="M8 9h8M8 13h8M8 17h5"></path></svg></span>
+      <strong id="manage-title">{% if active_account %}Opening your Marketplace listings...{% else %}No account selected{% endif %}</strong>
+      <p id="manage-message">{% if active_account %}{{ active_account }}{% elif accounts %}Choose an account in the header.{% else %}Add an account in Settings to get started.{% endif %}</p>
+      <button type="button" class="manage-listings-retry" id="manage-retry" hidden>Try again</button>
+    </div>
+  </div>
+</main>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/manage_listings.js') }}"></script>{% endblock %}

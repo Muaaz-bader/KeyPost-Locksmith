@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Extract Listings{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/create_listings.css') }}">
+<style>
+  .ex-page, .ex-page .create-page-head > div, .ex-page h1 { text-align:left; }
+  .ex-page .create-form-panel { width:100%; max-width:none; margin:0 0 16px; box-sizing:border-box; text-align:left; }
+  .ex-form { display:grid; grid-template-columns:minmax(0,1fr) 170px auto; gap:14px; align-items:end; }
+  .ex-form .input-field { margin:0 !important; }
+  .ex-form .file-label { margin-bottom:6px; }
+  .ex-actions { display:flex; gap:10px; }
+  .ex-actions button { min-height:44px; padding:0 22px; white-space:nowrap; }
+  .ex-actions button:disabled { opacity:.4; cursor:not-allowed; }
+  .ex-note { margin:10px 0 0; color:#555; font-size:12px; line-height:1.5; }
+  .ex-progress { display:none; border-top:3px solid #d9a441 !important; }
+  .ex-progress.is-visible { display:block; }
+  .ex-progress-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:10px; font-size:13px; color:#667587; }
+  .ex-progress-head strong { color:#1c2733; font-size:15px; }
+  .ex-progress-head span { font-weight:700; color:#a8761f; }
+  .ex-bar { height:10px; background:#eceff3; overflow:hidden; }
+  .ex-bar > span { display:block; height:100%; width:0; background:#d9a441; transition:width .3s; }
+  .ex-message { margin-top:10px; font-size:13px; color:#1c2733; }
+  .ex-message:empty { display:none; }
+  .ex-results { list-style:none; margin:14px 0 0; padding:0; display:grid; gap:8px; }
+  .ex-results li { display:grid; grid-template-columns:64px minmax(0,1fr) auto; gap:12px; align-items:center; padding:8px 10px; background:#f6f8fa; border:1px solid #e3e7ec; font-size:13px; text-align:left; }
+  .ex-thumb { width:64px; height:64px; object-fit:cover; background:#e8ebef; cursor:pointer; }
+  .ex-info { min-width:0; cursor:pointer; }
+  .ex-info strong { display:block; color:#1c2733; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ex-info small { color:#667587; }
+  .ex-info:hover strong { text-decoration:underline; }
+  .ex-post { display:flex; gap:6px; align-items:center; }
+  .ex-delay { width:min(360px, calc(100% - 32px)); padding:18px 20px; border:0; box-shadow:0 24px 70px rgba(0,0,0,.35); text-align:left; }
+  .ex-delay[open] { position:fixed; inset:0; margin:auto; height:fit-content; max-height:calc(100dvh - 32px); overflow:auto; box-sizing:border-box; }
+  .ex-delay::backdrop { background:rgba(10,15,22,.6); }
+  .ex-delay h2 { margin:0 0 4px; font-size:17px; color:#1c2733; }
+  .ex-delay p { margin:0 0 12px; color:#667587; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ex-delay-row { display:flex; gap:8px; }
+  .ex-delay-row input { width:90px; min-height:36px; padding:4px 8px; border:1px solid #bdbdbd; }
+  .ex-delay-row select { flex:1; min-height:36px; border:1px solid #bdbdbd; background:#fff; }
+  .ex-delay-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+  .ex-delay-foot button { min-height:36px; padding:0 16px; font-weight:700; cursor:pointer; }
+  .ex-delay-foot .ex-delay-cancel { border:1px solid #c9ced6; background:#fff; }
+  .ex-delay-foot .ex-delay-ok { border:0; background:#1c2733; color:#f3d48f; }
+  .ex-delay-foot button:disabled { opacity:.5; cursor:not-allowed; }
+  .ex-post button { min-height:34px; padding:0 14px; border:0; background:#1c2733; color:#f3d48f; font-weight:700; cursor:pointer; }
+  .ex-post button:disabled { opacity:.5; cursor:not-allowed; }
+  .ex-viewer { width:min(860px, calc(100% - 32px)); max-height:calc(100dvh - 40px); padding:0; border:0; box-shadow:0 24px 70px rgba(0,0,0,.35); }
+  .ex-viewer::backdrop { background:rgba(10,15,22,.6); }
+  .ex-viewer[open] { position:fixed; inset:0; margin:auto; height:fit-content; overflow:auto; }
+  .ex-viewer-body { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:0; }
+  .ex-viewer-photo { position:relative; background:#111; min-height:360px; display:flex; align-items:center; justify-content:center; }
+  .ex-viewer-photo img { max-width:100%; max-height:62dvh; object-fit:contain; }
+  .ex-viewer-photo button { position:absolute; top:50%; transform:translateY(-50%); width:36px; height:36px; border:0; border-radius:50%; background:rgba(255,255,255,.85); font-size:18px; cursor:pointer; }
+  .ex-viewer-photo .ex-prev { left:10px; } .ex-viewer-photo .ex-next { right:10px; }
+  .ex-viewer-count { position:absolute; bottom:8px; right:10px; color:#fff; font-size:12px; background:rgba(0,0,0,.5); padding:2px 8px; }
+  .ex-viewer-text { padding:18px 20px; overflow:auto; max-height:70dvh; text-align:left; }
+  .ex-viewer-text h2 { margin:0 0 6px; font-size:19px; color:#1c2733; }
+  .ex-viewer-price { font-size:17px; font-weight:800; color:#1c2733; }
+  .ex-viewer-meta { margin:6px 0 12px; color:#667587; font-size:12px; }
+  .ex-viewer-desc { white-space:pre-line; font-size:13px; line-height:1.55; color:#2b3440; }
+  .ex-viewer-foot { display:flex; justify-content:space-between; gap:12px; align-items:center; padding:12px 20px; border-top:1px solid #e3e7ec; }
+  .ex-viewer-close { min-height:34px; padding:0 14px; border:1px solid #c9ced6; background:#fff; cursor:pointer; font-weight:700; }
+  @media(max-width:760px) { .ex-viewer-body { grid-template-columns:1fr; } .ex-results li { grid-template-columns:52px minmax(0,1fr); } .ex-post { grid-column:1/-1; } }
+  .ex-errors { margin-top:12px; padding:10px 12px; border-left:3px solid #b3372f; background:#fbeceb; color:#7d2a24; font-size:12.5px; line-height:1.6; }
+  .ex-errors:empty { display:none; }
+  @media(max-width:760px) { .ex-form { grid-template-columns:1fr; } }
+</style>{% endblock %}
+
+{% block content %}
+<main class="create-page ex-page">
+  <div class="create-page-head">
+    <div>
+      <h1>Extract Listings</h1>
+      <p>Search Marketplace and save the listings you find to Backup Posts.</p>
+    </div>
+    <a href="{{ url_for('web.backup_listings_page') if active_account else url_for('web.dashboard') }}" class="create-back">Open Backup Posts</a>
+  </div>
+
+  <section class="form-box create-form-panel">
+    <form id="extract-form" class="ex-form" autocomplete="off">
+      <div>
+        <label for="ex-keywords" class="file-label">What to search for</label>
+        <input id="ex-keywords" name="keywords" type="text" class="input-field" maxlength="120" required
+               placeholder="e.g. car key programming" value="{{ extract_status.get('keywords', '') }}">
+      </div>
+      <div>
+        <label for="ex-count" class="file-label">How many listings</label>
+        <input id="ex-count" name="count" type="number" class="input-field" min="1" max="{{ max_listings }}" required
+               value="{{ extract_status.get('target', 3) }}">
+      </div>
+      <div class="ex-actions">
+        <button type="submit" id="ex-start" class="manual-action-button">Start</button>
+        <button type="button" id="ex-stop" class="manual-action-button manual-action-secondary" disabled>Stop</button>
+      </div>
+    </form>
+    <p class="ex-note">
+      {% if active_account %}Saved to <strong>{{ active_account }}</strong>'s Backup Posts.
+      {% else %}<strong>Select an account in the top bar first.</strong>{% endif %}
+    </p>
+  </section>
+
+  <section id="ex-progress" class="form-box create-form-panel ex-progress" aria-live="polite">
+    <div class="ex-progress-head"><strong id="ex-stage">Getting ready…</strong><span id="ex-count-text"></span></div>
+    <div class="ex-bar"><span id="ex-bar"></span></div>
+    <div id="ex-message" class="ex-message"></div>
+    <ul id="ex-results" class="ex-results"></ul>
+    <div id="ex-errors" class="ex-errors"></div>
+  </section>
+</main>
+<dialog id="ex-viewer" class="ex-viewer" aria-labelledby="ex-viewer-title">
+  <div class="ex-viewer-body">
+    <div class="ex-viewer-photo"><img id="ex-viewer-img" alt=""><button type="button" class="ex-prev" aria-label="Previous photo">&#8249;</button><button type="button" class="ex-next" aria-label="Next photo">&#8250;</button><span id="ex-viewer-count" class="ex-viewer-count"></span></div>
+    <div class="ex-viewer-text"><h2 id="ex-viewer-title"></h2><div id="ex-viewer-price" class="ex-viewer-price"></div><div id="ex-viewer-meta" class="ex-viewer-meta"></div><div id="ex-viewer-desc" class="ex-viewer-desc"></div></div>
+  </div>
+  <div class="ex-viewer-foot"><div id="ex-viewer-post" class="ex-post"></div><button type="button" class="ex-viewer-close" id="ex-viewer-close">Close</button></div>
+</dialog>
+<dialog id="ex-delay" class="ex-delay" aria-labelledby="ex-delay-title">
+  <form id="ex-delay-form" method="dialog">
+    <h2 id="ex-delay-title">Post this listing</h2>
+    <p id="ex-delay-name"></p>
+    <label for="ex-delay-value" class="file-label">Wait before posting (0 = post now)</label>
+    <div class="ex-delay-row">
+      <input id="ex-delay-value" type="number" min="0" step="1" value="0" required>
+      <select id="ex-delay-unit" aria-label="Delay unit"><option value="minutes">minutes</option><option value="hours">hours</option><option value="days">days</option></select>
+    </div>
+    <div class="ex-delay-foot">
+      <button type="button" class="ex-delay-cancel" id="ex-delay-cancel">Cancel</button>
+      <button type="submit" class="ex-delay-ok" id="ex-delay-ok">Schedule post</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(() => {
+  const form = document.getElementById('extract-form');
+  const startBtn = document.getElementById('ex-start');
+  const stopBtn = document.getElementById('ex-stop');
+  const panel = document.getElementById('ex-progress');
+  const list = document.getElementById('ex-results');
+  const activeAccount = {{ active_account|tojson }};
+  const viewer = document.getElementById('ex-viewer');
+  let timer = null, items = [], renderedCount = -1, viewing = null, photoIndex = 0;
+
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const photoUrl = (item, name) => '/delete_listings/photo/' + encodeURIComponent(item.id) + '/' + encodeURIComponent(name);
+  const queued = new Set();
+  const postControls = id => queued.has(id)
+    ? `<button type="button" disabled>Scheduled</button>`
+    : `<button type="button" data-post="${esc(id)}">Post</button>`;
+
+  function renderList() {
+    if (items.length === renderedCount) return;
+    renderedCount = items.length;
+    list.innerHTML = items.map((item, i) => {
+      const thumb = (item.photo_names || [])[0];
+      return `<li>` +
+        (thumb ? `<img class="ex-thumb" src="${photoUrl(item, thumb)}" alt="" data-view="${i}">` : `<span class="ex-thumb" data-view="${i}"></span>`) +
+        `<div class="ex-info" data-view="${i}"><strong>${esc(item.title)}</strong>` +
+        `<small>${[esc(item.price), esc(item.listed_info), item.photos + (item.photos === 1 ? ' photo' : ' photos')].filter(Boolean).join(' · ')}</small></div>` +
+        `<div class="ex-post">${postControls(item.id)}</div></li>`;
+    }).join('');
+  }
+
+  let watching = false;   // true once this page has seen the extraction running
+  function render(st) {
+    if (!st) return;
+    if (!st.running) {
+      // Finished (or nothing running): results are in Backup Posts, so clear them from this page.
+      if (watching && st.message && window.appNotify) {
+        window.appNotify(st.message, st.stage === 'Failed' ? 'failed' : st.stage === 'Stopped' ? 'info' : 'success');
+      }
+      watching = false;
+      items = []; renderedCount = -1; list.innerHTML = '';
+      document.getElementById('ex-errors').innerHTML = '';
+      panel.classList.remove('is-visible');
+      if (viewer.open) viewer.close();
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      if (timer) { clearInterval(timer); timer = null; }
+      return;
+    }
+    watching = true;
+    panel.classList.add('is-visible');
+    const target = st.target || 0, saved = st.saved || 0;
+    document.getElementById('ex-stage').textContent = st.stage || '';
+    document.getElementById('ex-count-text').textContent = `${saved} of ${target} saved`;
+    document.getElementById('ex-bar').style.width = target ? Math.min(100, Math.round(saved / target * 100)) + '%' : '0';
+    document.getElementById('ex-message').textContent = st.message || '';
+    items = st.items || [];
+    renderList();
+    document.getElementById('ex-errors').innerHTML = (st.errors || []).length
+      ? `<strong>Some listings couldn't be saved:</strong><br>` + st.errors.slice(-5).map(esc).join('<br>') : '';
+    startBtn.disabled = !!st.running;
+    stopBtn.disabled = !st.running;
+    if (!st.running && timer) { clearInterval(timer); timer = null; }
+  }
+
+  // ---- Viewer popup
+  function showPhoto() {
+    const names = viewing.photo_names || [];
+    const img = document.getElementById('ex-viewer-img');
+    img.src = names.length ? photoUrl(viewing, names[photoIndex]) : '';
+    img.hidden = !names.length;
+    document.getElementById('ex-viewer-count').textContent = names.length ? `${photoIndex + 1} / ${names.length}` : 'No photos';
+    viewer.querySelectorAll('.ex-prev, .ex-next').forEach(button => { button.hidden = names.length < 2; });
+  }
+  function openViewer(index) {
+    viewing = items[index];
+    if (!viewing) return;
+    photoIndex = 0;
+    document.getElementById('ex-viewer-title').textContent = viewing.title || '';
+    document.getElementById('ex-viewer-price').textContent = viewing.price || '';
+    document.getElementById('ex-viewer-meta').textContent = [viewing.listed_info, viewing.condition && ('Condition: ' + viewing.condition)].filter(Boolean).join(' · ');
+    document.getElementById('ex-viewer-desc').textContent = viewing.description || 'No description.';
+    document.getElementById('ex-viewer-post').innerHTML = postControls(viewing.id);
+    showPhoto();
+    viewer.showModal();
+  }
+  viewer.querySelector('.ex-prev').addEventListener('click', () => { const n = (viewing.photo_names || []).length; photoIndex = (photoIndex - 1 + n) % n; showPhoto(); });
+  viewer.querySelector('.ex-next').addEventListener('click', () => { const n = (viewing.photo_names || []).length; photoIndex = (photoIndex + 1) % n; showPhoto(); });
+  document.getElementById('ex-viewer-close').addEventListener('click', () => viewer.close());
+  viewer.addEventListener('click', event => { if (event.target === viewer) viewer.close(); });
+
+  // ---- Clicks: open viewer, or Post -> delay popup -> queue on the active account
+  const delayDialog = document.getElementById('ex-delay');
+  const delayForm = document.getElementById('ex-delay-form');
+  const delayOk = document.getElementById('ex-delay-ok');
+  let postingId = null;
+
+  function markQueued(id) {
+    queued.add(id);
+    document.querySelectorAll('[data-post]').forEach(button => {
+      if (button.dataset.post === id) { button.textContent = 'Scheduled'; button.disabled = true; button.removeAttribute('data-post'); }
+    });
+  }
+
+  document.addEventListener('click', event => {
+    const view = event.target.closest('[data-view]');
+    if (view && list.contains(view)) { openViewer(Number(view.dataset.view)); return; }
+    const post = event.target.closest('[data-post]');
+    if (!post) return;
+    postingId = post.dataset.post;
+    const item = items.find(entry => entry.id === postingId);
+    document.getElementById('ex-delay-name').textContent = item ? item.title : '';
+    document.getElementById('ex-delay-value').value = 0;
+    document.getElementById('ex-delay-unit').value = 'minutes';
+    delayOk.disabled = false;
+    delayDialog.showModal();
+  });
+  document.getElementById('ex-delay-cancel').addEventListener('click', () => delayDialog.close());
+  delayDialog.addEventListener('click', event => { if (event.target === delayDialog) delayDialog.close(); });
+  delayForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const value = Number(document.getElementById('ex-delay-value').value);
+    if (!Number.isInteger(value) || value < 0) { window.appNotify && window.appNotify('Enter a wait time of 0 or more.', 'failed'); return; }
+    delayOk.disabled = true;
+    try {
+      const response = await appFetch('/backup/' + encodeURIComponent(postingId) + '/post', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({account: activeAccount, delay_value: value, delay_unit: document.getElementById('ex-delay-unit').value})});
+      const data = await response.json();
+      if (response.ok && data.ok) { markQueued(postingId); delayDialog.close(); }
+      else delayOk.disabled = false;
+    } catch (_) { delayOk.disabled = false; }
+  });
+
+  // ---- Start / Stop / polling
+  async function poll() {
+    try {
+      const res = await appFetch('{{ url_for("web.extract_listings_status") }}', {timeoutMs: 10000});
+      render((await res.json()).status);
+    } catch (_) {}
+  }
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    startBtn.disabled = true;
+    try {
+      const res = await appFetch('{{ url_for("web.extract_listings_start") }}', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({keywords: form.keywords.value, count: form.count.value})});
+      const data = await res.json();
+      if (!res.ok || !data.ok) { startBtn.disabled = false; return; }
+      renderedCount = -1;
+      render(data.status);
+      if (!timer) timer = setInterval(poll, 2000);
+    } catch (_) { startBtn.disabled = false; }
+  });
+  stopBtn.addEventListener('click', async () => {
+    stopBtn.disabled = true;
+    try { render((await (await appFetch('{{ url_for("web.extract_listings_stop") }}', {method: 'POST'})).json()).status); } catch (_) {}
+  });
+
+  render({{ extract_status|tojson }});
+  if ({{ 'true' if extract_status.get('running') else 'false' }}) timer = setInterval(poll, 2000);
+})();
+</script>
+{% endblock %}
