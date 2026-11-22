@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+
+{% block title %}Ad Research{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/create_listings.css') }}">
+<style>
+  .ar-page, .ar-page .create-page-head > div, .ar-page h1 { text-align:left; }
+  .ar-page .create-form-panel { width:100%; max-width:none; margin:0 0 16px; box-sizing:border-box; text-align:left; }
+  .ar-warning { margin:0 0 16px; padding:12px 14px; border-left:4px solid #b3372f; background:#fbeceb; color:#8a1f17; font-weight:700; font-size:13.5px; }
+  .ar-keywords { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px 14px; }
+  .ar-keywords .input-field, .ar-row .input-field { margin:0 !important; }
+  .ar-tip { margin:8px 0 16px; color:#667587; font-size:12px; }
+  .ar-row { display:grid; grid-template-columns:minmax(0,1fr) 190px auto; gap:14px; align-items:end; }
+  .ar-row .file-label, .ar-keywords-label { display:block; margin-bottom:6px; }
+  .ar-actions { display:flex; gap:10px; }
+  .ar-actions button { min-height:44px; padding:0 20px; white-space:nowrap; }
+  .ar-actions button:disabled { opacity:.4; cursor:not-allowed; }
+  .ar-note { margin:10px 0 0; color:#555; font-size:12px; }
+  .ar-progress { display:none; border-top:3px solid #d9a441 !important; }
+  .ar-progress.is-visible { display:block; }
+  .ar-progress-head { display:flex; justify-content:space-between; gap:12px; margin-bottom:10px; font-size:13px; color:#667587; }
+  .ar-progress-head strong { color:#1c2733; font-size:15px; }
+  .ar-bar { height:10px; background:#eceff3; overflow:hidden; }
+  .ar-bar > span { display:block; height:100%; width:0; background:#d9a441; transition:width .3s; }
+  .ar-results[hidden] { display:none; }
+  .ar-results-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; margin:6px 0 12px; }
+  .ar-results-head h2 { margin:0; font-size:20px; color:#1c2733; }
+  .ar-results-head small { color:#667587; }
+  .ar-clear { min-height:34px; padding:0 14px; border:1px solid #e5b4b4; background:#fff; color:#b42318; font-weight:700; cursor:pointer; }
+  .ar-stats { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+  .ar-stat { padding:14px; background:#fff; border:1px solid #e3e7ec; }
+  .ar-stat b { display:block; font-size:26px; color:#1c2733; }
+  .ar-stat span { color:#667587; font-size:12px; }
+  .ar-stat.is-best { border-top:3px solid #d9a441; }
+  .ar-box { padding:16px 18px; margin-bottom:16px; background:#fff; border:1px solid #e3e7ec; }
+  .ar-box h3 { margin:0 0 10px; font-size:16px; color:#1c2733; }
+  .ar-findings { margin:0; padding-left:18px; line-height:1.7; font-size:13.5px; color:#2b3440; }
+  .ar-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .ar-table th, .ar-table td { padding:8px 10px; border-bottom:1px solid #eceff3; text-align:left; }
+  .ar-table th { color:#667587; font-weight:700; font-size:12px; }
+  .ar-ages { display:flex; flex-wrap:wrap; gap:8px; }
+  .ar-age { padding:6px 10px; background:#f6f8fa; border:1px solid #e3e7ec; font-size:12.5px; }
+  .ar-age b { color:#1c2733; }
+  .ar-cards { display:grid; gap:10px; }
+  .ar-card { display:grid; grid-template-columns:120px minmax(0,1fr) auto; gap:14px; padding:12px; background:#fff; border:1px solid #e3e7ec; align-items:start; }
+  .ar-card.is-best { border-left:4px solid #d9a441; }
+  .ar-card img, .ar-card .ar-noimg { width:120px; height:100px; object-fit:cover; background:#e8ebef; display:flex; align-items:center; justify-content:center; color:#8a94a3; font-size:12px; }
+  .ar-card h4 { margin:0 0 4px; font-size:15px; color:#1c2733; overflow-wrap:anywhere; }
+  .ar-stars { color:#d9a441; letter-spacing:1px; font-size:15px; }
+  .ar-stars .off { color:#d5dae1; }
+  .ar-best { margin-left:6px; padding:1px 7px; background:#1c2733; color:#f3d48f; font-size:10.5px; font-weight:800; letter-spacing:.06em; vertical-align:middle; }
+  .ar-meta { margin:4px 0; color:#667587; font-size:12.5px; }
+  .ar-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+  .ar-chip { padding:2px 8px; background:#eef2f7; color:#294567; font-size:11.5px; }
+  .ar-chip.warn { background:#fff4e0; color:#8a5a00; }
+  .ar-why { margin-top:6px; color:#2b3440; font-size:12.5px; }
+  .ar-card-actions { display:flex; flex-direction:column; gap:6px; min-width:170px; }
+  .ar-card-actions button, .ar-card-actions a { display:inline-flex; justify-content:center; align-items:center; min-height:34px; padding:0 12px; border:0; background:#1c2733; color:#f3d48f; font:inherit; font-size:13px; font-weight:700; text-decoration:none; cursor:pointer; }
+  .ar-card-actions a { background:#fff; color:#1c2733; border:1px solid #c9ced6; }
+  .ar-card-actions button:disabled { opacity:.55; cursor:default; }
+  .ar-errors { margin-top:12px; color:#7d2a24; font-size:12px; }
+  .ar-card [data-view] { cursor:pointer; }
+  .ar-card [data-view]:hover h4 { text-decoration:underline; }
+  .ar-viewer { width:min(900px, calc(100% - 32px)); max-height:calc(100dvh - 40px); padding:0; border:0; box-shadow:0 24px 70px rgba(0,0,0,.35); }
+  .ar-viewer::backdrop { background:rgba(10,15,22,.6); }
+  .ar-viewer[open] { position:fixed; inset:0; margin:auto; height:fit-content; overflow:auto; }
+  .ar-viewer-body { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); }
+  .ar-viewer-photo { position:relative; background:#111; min-height:380px; display:flex; align-items:center; justify-content:center; }
+  .ar-viewer-photo img { max-width:100%; max-height:64dvh; object-fit:contain; }
+  .ar-viewer-photo button { position:absolute; top:50%; transform:translateY(-50%); width:36px; height:36px; border:0; border-radius:50%; background:rgba(255,255,255,.85); font-size:18px; cursor:pointer; }
+  .ar-viewer-photo .ar-prev { left:10px; } .ar-viewer-photo .ar-next { right:10px; }
+  .ar-viewer-count { position:absolute; bottom:8px; right:10px; color:#fff; font-size:12px; background:rgba(0,0,0,.5); padding:2px 8px; }
+  .ar-viewer-text { padding:18px 20px; overflow:auto; max-height:70dvh; text-align:left; }
+  .ar-viewer-text h2 { margin:0 0 6px; font-size:19px; color:#1c2733; overflow-wrap:anywhere; }
+  .ar-viewer-price { font-size:17px; font-weight:800; color:#1c2733; margin-top:4px; }
+  .ar-viewer-desc { margin-top:12px; white-space:pre-line; font-size:13px; line-height:1.55; color:#2b3440; }
+  .ar-viewer-foot { display:flex; justify-content:space-between; gap:12px; align-items:center; padding:12px 20px; border-top:1px solid #e3e7ec; }
+  .ar-viewer-foot .ar-card-actions { flex-direction:row; min-width:0; }
+  .ar-viewer-close { min-height:34px; padding:0 14px; border:1px solid #c9ced6; background:#fff; cursor:pointer; font-weight:700; }
+  @media(max-width:760px) { .ar-viewer-body { grid-template-columns:1fr; } .ar-viewer-photo { min-height:260px; } .ar-viewer-foot { flex-direction:column; align-items:stretch; } }
+  @media(max-width:900px) { .ar-stats { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+  @media(max-width:760px) { .ar-keywords, .ar-row { grid-template-columns:1fr; } .ar-card { grid-template-columns:90px minmax(0,1fr); } .ar-card img, .ar-card .ar-noimg { width:90px; height:80px; } .ar-card-actions { grid-column:1/-1; flex-direction:row; } }
+</style>{% endblock %}
+
+{% block content %}
+<main class="create-page ar-page">
+  <div class="create-page-head">
+    <div>
+      <h1>Ad Research</h1>
+      <p>See which locksmith listings work on Facebook Marketplace: ads found by many searches and still running for weeks.</p>
+    </div>
+    <a href="{{ url_for('web.backup_listings_page') if active_account else url_for('web.dashboard') }}" class="create-back">Open Backup Posts</a>
+  </div>
+
+  <p class="ar-warning">Do not use your main posting account for research. Select a separate account in the top bar.</p>
+
+  <section class="form-box create-form-panel">
+    <form id="ar-form" autocomplete="off" data-ajax="true">
+      <span class="file-label ar-keywords-label">Keywords (fill any number, up to {{ max_keywords }})</span>
+      <div class="ar-keywords">
+        {% for i in range(max_keywords) %}
+        <input type="text" class="input-field" name="keyword" maxlength="80" aria-label="Keyword {{ i + 1 }}"
+               placeholder="Keyword {{ i + 1 }}{% if i == 0 %} e.g. car lockout{% elif i == 1 %} e.g. key fob programming{% endif %}"
+               value="{{ (research_status.get('keywords') or [])[i] if (research_status.get('keywords') or [])|length > i else '' }}">
+        {% endfor %}
+      </div>
+      <p class="ar-tip">Tip: use different services (car lockout, house rekey, key programming), not variations of one word. Listings found by several different searches are the strong ones.</p>
+      <div class="ar-row">
+        <div>
+          <label for="ar-location" class="file-label">Location (optional)</label>
+          <input id="ar-location" name="location" type="text" class="input-field" maxlength="80"
+                 placeholder="e.g. Dallas, Texas" value="{{ research_status.get('location', '') }}">
+        </div>
+        <div>
+          <label for="ar-count" class="file-label">Listings per keyword</label>
+          <input id="ar-count" name="per_keyword" type="number" class="input-field" min="1" max="{{ max_per_keyword }}"
+                 required value="{{ research_status.get('per_keyword', 10) }}">
+        </div>
+        <div class="ar-actions">
+          <button type="submit" id="ar-start" class="manual-action-button">Start</button>
+          <button type="button" id="ar-stop" class="manual-action-button manual-action-secondary" disabled>Stop</button>
+        </div>
+      </div>
+    </form>
+    <p class="ar-note">
+      {% if active_account %}Research runs on <strong>{{ active_account }}</strong>. Searches use Facebook's "Last 30 days" filter. If you enter a location, the account's own location is put back afterwards.
+      {% else %}<strong>Select an account in the top bar first.</strong>{% endif %}
+    </p>
+  </section>
+
+  <section id="ar-progress" class="form-box create-form-panel ar-progress" aria-live="polite">
+    <div class="ar-progress-head"><strong id="ar-stage">Getting ready…</strong><span id="ar-counts"></span></div>
+    <div class="ar-bar"><span id="ar-bar"></span></div>
+  </section>
+
+  <section id="ar-results" class="ar-results" hidden></section>
+</main>
+<dialog id="ar-viewer" class="ar-viewer" aria-labelledby="ar-viewer-title">
+  <div class="ar-viewer-body">
+    <div class="ar-viewer-photo"><img id="ar-viewer-img" alt=""><button type="button" class="ar-prev" aria-label="Previous photo">&#8249;</button><button type="button" class="ar-next" aria-label="Next photo">&#8250;</button><span id="ar-viewer-count" class="ar-viewer-count"></span></div>
+    <div class="ar-viewer-text">
+      <h2 id="ar-viewer-title"></h2>
+      <div id="ar-viewer-stars"></div>
+      <div id="ar-viewer-price" class="ar-viewer-price"></div>
+      <div id="ar-viewer-meta" class="ar-meta"></div>
+      <div id="ar-viewer-why" class="ar-why"></div>
+      <div id="ar-viewer-chips" class="ar-chips"></div>
+      <div id="ar-viewer-desc" class="ar-viewer-desc"></div>
+    </div>
+  </div>
+  <div class="ar-viewer-foot"><div id="ar-viewer-actions" class="ar-card-actions"></div><button type="button" class="ar-viewer-close" id="ar-viewer-close">Close</button></div>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(() => {
+  const form = document.getElementById('ar-form');
+  const startBtn = document.getElementById('ar-start');
+  const stopBtn = document.getElementById('ar-stop');
+  const panel = document.getElementById('ar-progress');
+  const resultsBox = document.getElementById('ar-results');
+  let timer = null, watching = false, results = {{ research_results|tojson }};
+
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const photo = (item, name) => '/ad_research/photo/' + encodeURIComponent(item.id) + '/' + encodeURIComponent(name);
+  const stars = n => '<span class="ar-stars" aria-label="' + n + ' of 5 stars">' + '★'.repeat(n) + '<span class="off">' + '★'.repeat(5 - n) + '</span></span>';
+  const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+
+  function findings(t, s) {
+    if (!t) return '';
+    const lines = [];
+    if (t.placeholder_price_pct >= 50) lines.push(`<b>${t.placeholder_price_pct}%</b> use a $0/$1 placeholder price instead of a real price.`);
+    else if (t.typical_price !== null) lines.push(`Typical price: <b>$${t.typical_price}</b> (${t.placeholder_price_pct}% use a $0/$1 placeholder).`);
+    else lines.push(`${t.placeholder_price_pct}% use a $0/$1 placeholder price.`);
+    if (t.top_words.length) lines.push(`Most common title words: <b>${t.top_words.map(esc).join(', ')}</b>.`);
+    lines.push(`Photos per ad: <b>${t.avg_photos}</b> on average. Description length: <b>${t.avg_description_words}</b> words on average.`);
+    lines.push(`<b>${t.phone_in_text_pct}%</b> show a phone number in the title or description.`);
+    if (s.ocr_checked) lines.push(`<b>${t.phone_in_photo_pct}%</b> show a phone number inside a photo.`);
+    return lines.map(line => `<li>${line}</li>`).join('');
+  }
+
+  // Shared by the listing cards and the viewer popup.
+  // "Listed a day ago in Garland, TX" already names the place: don't repeat the location.
+  const placeText = item => [esc(item.listed_info || item.age_label),
+    item.location && !(item.listed_info || '').includes(item.location) ? esc(item.location) : ''].filter(Boolean).join(' · ');
+  const metaText = item => [esc(item.price_text), placeText(item), plural(item.photos.length, 'photo')].filter(Boolean).join(' · ');
+  const whyText = item => [`Found by ${plural(item.appearances, 'keyword search')}`, item.age_label === "Couldn't read" ? "age couldn't be read" : 'age: ' + esc(item.age_label)].join(' · ');
+  function chipsHtml(item) {
+    const tags = [];
+    if (item.phone_in_text) tags.push('Phone in text');
+    if (item.phone_in_photo) tags.push('Phone in photo');
+    return item.keywords.map(k => `<span class="ar-chip">${esc(k)}</span>`).join('') + tags.map(tag => `<span class="ar-chip warn">${tag}</span>`).join('');
+  }
+  function actionsHtml(item) {
+    const isSaved = !!(results && results.saved && results.saved[item.id]);
+    return `<button type="button" data-backup="${esc(item.id)}" ${isSaved || !item.photos.length ? 'disabled' : ''}>${isSaved ? 'In Backup Posts' : 'Add to Backup Posts'}</button>` +
+      `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">Open on Facebook</a>`;
+  }
+
+  function compareRow(label, a, b) { return `<tr><td>${label}</td><td><b>${a}</b></td><td>${b}</td></tr>`; }
+
+  function renderResults(r) {
+    if (!r || !r.listings) { resultsBox.hidden = true; resultsBox.innerHTML = ''; return; }
+    const s = r.summary, t = s.basis_traits, all = s.all_traits;
+    const basisName = {best: 'Best ads', multi: 'Ads found by 2+ keywords', top: 'Top ads'}[s.basis];
+    const chips = r.keywords.map(esc).join(', ');
+    let html = `<div class="ar-results-head"><div><h2>Results</h2><small>${esc(r.finished_at)} · ${chips}${r.location ? ' · ' + esc(r.location) : ''}${r.stopped ? ' · stopped early' : ''}</small></div>` +
+      `<button type="button" class="ar-clear" id="ar-clear">Clear results</button></div>`;
+    html += `<div class="ar-stats">` +
+      `<div class="ar-stat"><b>${s.total_results}</b><span>Total results</span></div>` +
+      `<div class="ar-stat"><b>${s.unique}</b><span>Unique listings</span></div>` +
+      `<div class="ar-stat"><b>${s.multi_keyword}</b><span>Found by 2+ keywords</span></div>` +
+      `<div class="ar-stat is-best"><b>${s.best}</b><span>Best (3+ keywords and 4+ weeks old)</span></div></div>`;
+    html += `<div class="ar-box"><h3>What the ${basisName.toLowerCase()} have in common${s.basis === 'best' ? '' : ' (no Best ads this run)'}</h3><ul class="ar-findings">${findings(t, s)}</ul></div>`;
+    if (all && t && t.count !== all.count) {
+      const price = x => x.typical_price !== null ? '$' + x.typical_price : '—';
+      html += `<div class="ar-box"><h3>${esc(basisName)} vs all ads</h3><table class="ar-table"><thead><tr><th></th><th>${esc(basisName)} (${t.count})</th><th>All ads (${all.count})</th></tr></thead><tbody>` +
+        compareRow('Typical price', price(t), price(all)) +
+        compareRow('$0/$1 placeholder price', t.placeholder_price_pct + '%', all.placeholder_price_pct + '%') +
+        compareRow('Average photos', t.avg_photos, all.avg_photos) +
+        compareRow('Description words', t.avg_description_words, all.avg_description_words) +
+        compareRow('Phone in title/description', t.phone_in_text_pct + '%', all.phone_in_text_pct + '%') +
+        (s.ocr_checked ? compareRow('Phone inside a photo', t.phone_in_photo_pct + '%', all.phone_in_photo_pct + '%') : '') +
+        `</tbody></table></div>`;
+    }
+    html += `<div class="ar-box"><h3>How old the listings are</h3><div class="ar-ages">` +
+      s.ages.map(a => `<span class="ar-age">${esc(a.label)}: <b>${a.count}</b></span>`).join('') + `</div></div>`;
+    html += `<div class="ar-box"><h3>Keywords</h3><table class="ar-table"><thead><tr><th>Keyword</th><th>Listings found</th><th>Also found by other keywords</th></tr></thead><tbody>` +
+      r.keyword_stats.map(k => `<tr><td>${esc(k.keyword)}</td><td>${k.results}</td><td>${k.overlap}</td></tr>`).join('') + `</tbody></table></div>`;
+    html += `<h3 style="margin:18px 0 10px;color:#1c2733">Listings (most-found first) <small style="color:#667587;font-weight:400">· click a listing to see its photos and description</small></h3><div class="ar-cards">` + r.listings.map((item, index) =>
+      `<article class="ar-card${item.best ? ' is-best' : ''}">` +
+        (item.photos.length ? `<img src="${photo(item, item.photos[0])}" alt="" loading="lazy" data-view="${index}">` : `<div class="ar-noimg" data-view="${index}">No photo</div>`) +
+        `<div data-view="${index}"><h4>${esc(item.title || 'Untitled listing')}</h4><div>${stars(item.stars)}${item.best ? '<span class="ar-best">BEST</span>' : ''}</div>` +
+        `<div class="ar-meta">${metaText(item)}</div>` +
+        `<div class="ar-why">${whyText(item)}</div>` +
+        `<div class="ar-chips">${chipsHtml(item)}</div></div>` +
+        `<div class="ar-card-actions">${actionsHtml(item)}</div></article>`
+    ).join('') + `</div>`;
+    if ((r.errors || []).length) html += `<div class="ar-errors"><strong>Some listings couldn't be read:</strong><br>${r.errors.slice(-5).map(esc).join('<br>')}</div>`;
+    resultsBox.innerHTML = html;
+    resultsBox.hidden = false;
+  }
+
+  function render(st, newResults) {
+    if (!st) return;
+    if (newResults !== undefined) { results = newResults; }
+    if (!st.running) {
+      if (watching && st.message && window.appNotify) {
+        window.appNotify(st.message, st.stage === 'Failed' ? 'failed' : st.stage === 'Stopped' ? 'info' : 'success');
+      }
+      watching = false;
+      panel.classList.remove('is-visible');
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      if (timer) { clearInterval(timer); timer = null; }
+      renderResults(results);
+      return;
+    }
+    watching = true;
+    resultsBox.hidden = true;
+    panel.classList.add('is-visible');
+    document.getElementById('ar-stage').textContent = st.stage || '';
+    const unique = st.unique || 0, read = st.read || 0;
+    document.getElementById('ar-counts').textContent = unique ? `${st.found || 0} results · ${unique} unique · ${read} read` : '';
+    document.getElementById('ar-bar').style.width = unique ? Math.min(100, Math.round(read / unique * 100)) + '%' : '4%';
+    startBtn.disabled = true;
+    stopBtn.disabled = st.stage === 'Stopping…';
+  }
+
+  async function poll() {
+    try {
+      const data = await (await appFetch('{{ url_for("web.ad_research_status") }}', {timeoutMs: 10000})).json();
+      render(data.status, data.status.running ? undefined : (data.results || null));
+    } catch (_) {}
+  }
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const keywords = [...form.querySelectorAll('[name="keyword"]')].map(input => input.value.trim()).filter(Boolean);
+    startBtn.disabled = true;
+    try {
+      const response = await appFetch('{{ url_for("web.ad_research_start") }}', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({keywords, location: form.location.value, per_keyword: form.per_keyword.value})});
+      const data = await response.json();
+      if (!response.ok || !data.ok) { startBtn.disabled = false; return; }
+      render(data.status, null);
+      if (!timer) timer = setInterval(poll, 2000);
+    } catch (_) { startBtn.disabled = false; }
+  });
+
+  stopBtn.addEventListener('click', async () => {
+    stopBtn.disabled = true;
+    try { await appFetch('{{ url_for("web.ad_research_stop") }}', {method: 'POST'}); } catch (_) {}
+  });
+
+  resultsBox.addEventListener('click', async event => {
+    if (event.target.id === 'ar-clear') {
+      if (!confirm('Clear these results? Photos of listings not added to Backup Posts will be deleted.')) return;
+      try {
+        const response = await appFetch('{{ url_for("web.ad_research_clear") }}', {method: 'POST'});
+        if (response.ok) { results = null; renderResults(null); }
+      } catch (_) {}
+      return;
+    }
+    const view = event.target.closest('[data-view]');
+    if (view) openViewer(Number(view.dataset.view));
+  });
+
+  // ---- Add to Backup Posts (card or viewer): every button for that listing updates together.
+  document.addEventListener('click', async event => {
+    const button = event.target.closest('[data-backup]');
+    if (!button || button.disabled) return;
+    const id = button.dataset.backup;
+    const buttons = () => document.querySelectorAll(`[data-backup="${CSS.escape(id)}"]`);
+    buttons().forEach(b => { b.disabled = true; });
+    try {
+      const response = await appFetch('/ad_research/backup/' + encodeURIComponent(id), {method: 'POST'});
+      const data = await response.json();
+      if (response.ok && data.ok) {
+        results.saved = results.saved || {};
+        results.saved[id] = data.record_id;
+        buttons().forEach(b => { b.textContent = 'In Backup Posts'; });
+      } else buttons().forEach(b => { b.disabled = false; });
+    } catch (_) { buttons().forEach(b => { b.disabled = false; }); }
+  });
+
+  // ---- Viewer popup: photos, description and details of one listing.
+  const viewer = document.getElementById('ar-viewer');
+  let viewing = null, photoIndex = 0;
+  function showPhoto() {
+    const names = viewing.photos || [];
+    const img = document.getElementById('ar-viewer-img');
+    img.hidden = !names.length;
+    if (names.length) img.src = photo(viewing, names[photoIndex]);
+    document.getElementById('ar-viewer-count').textContent = names.length ? `${photoIndex + 1} / ${names.length}` : 'No photos';
+    viewer.querySelectorAll('.ar-prev, .ar-next').forEach(b => { b.hidden = names.length < 2; });
+  }
+  function openViewer(index) {
+    viewing = results && results.listings ? results.listings[index] : null;
+    if (!viewing) return;
+    photoIndex = 0;
+    document.getElementById('ar-viewer-title').textContent = viewing.title || 'Untitled listing';
+    document.getElementById('ar-viewer-stars').innerHTML = stars(viewing.stars) + (viewing.best ? '<span class="ar-best">BEST</span>' : '');
+    document.getElementById('ar-viewer-price').textContent = viewing.price_text || '';
+    document.getElementById('ar-viewer-meta').innerHTML = placeText(viewing);
+    document.getElementById('ar-viewer-why').innerHTML = whyText(viewing);
+    document.getElementById('ar-viewer-chips').innerHTML = chipsHtml(viewing);
+    document.getElementById('ar-viewer-desc').textContent = viewing.description || 'No description.';
+    document.getElementById('ar-viewer-actions').innerHTML = actionsHtml(viewing);
+    showPhoto();
+    viewer.showModal();
+  }
+  const step = delta => { const n = (viewing.photos || []).length; if (n) { photoIndex = (photoIndex + delta + n) % n; showPhoto(); } };
+  viewer.querySelector('.ar-prev').addEventListener('click', () => step(-1));
+  viewer.querySelector('.ar-next').addEventListener('click', () => step(1));
+  viewer.addEventListener('keydown', event => { if (event.key === 'ArrowLeft') step(-1); if (event.key === 'ArrowRight') step(1); });
+  document.getElementById('ar-viewer-close').addEventListener('click', () => viewer.close());
+  viewer.addEventListener('click', event => { if (event.target === viewer) viewer.close(); });
+
+  const initial = {{ research_status|tojson }};
+  render(initial.running ? initial : {running: false});
+  if (initial.running) timer = setInterval(poll, 2000);
+})();
+</script>
+{% endblock %}

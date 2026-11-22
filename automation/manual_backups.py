@@ -74,6 +74,9 @@ def save_manual_listing(account, payload, *, confirmed=False):
         # Extracted from Marketplace search: shown in its own Backup Posts section.
         record.update(extracted=True, extracted_at=payload['_extracted_at'],
                       source_url=str(payload.get('source_url') or ''))
+        if payload.get('_research'):
+            # Ad Research mark (stars, Best) that sets it apart from other extracted listings.
+            record['research'] = dict(payload['_research'])
     if not listing_store.update_fields(account, listing_id, record, move_to_top=True):
         listing_store.add_at_top(account, record)
     if confirmed:

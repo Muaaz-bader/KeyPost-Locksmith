@@ -1076,8 +1076,9 @@ def _run_delete_job(account, limit, status_filter):
 
 
 def _extraction_running():
-    from automation import listing_extractor
-    return bool(listing_extractor.status().get('running'))
+    """True while Extract Listings or Ad Research is searching Marketplace."""
+    from automation import ad_research, listing_extractor
+    return bool(listing_extractor.status().get('running') or ad_research.status().get('running'))
 
 
 def _start_posting_after_extraction(job_id, expected_status):
@@ -2598,6 +2599,82 @@ def extract_listings_stop():
     from automation import listing_extractor
     stopped = listing_extractor.stop()
     return jsonify(ok=True, stopped=stopped, status=listing_extractor.status())
+
+
+# ---------------------------------------------------------------- Ad Research
+
+@web_bp.route("/ad_research")
+def ad_research_page():
+    from automation import ad_research
+    return render_template(
+        "ad_research.html",
+        accounts=get_all_accounts(),
+        active_account=get_active_account(),
+        active_page="ad_research",
+        max_keywords=ad_research.MAX_KEYWORDS,
+        max_per_keyword=ad_research.MAX_PER_KEYWORD,
+        research_status=ad_research.status(),
+        research_results=ad_research.load_results(),
+    )
+
+
+@web_bp.route("/ad_research/start", methods=["POST"])
+def ad_research_start():
+    from automation import ad_research
+    data = request.get_json(silent=True) or {}
+    try:
+        with scheduled_posts_lock:
+            if any(meta.get('status') == 'posting' for meta in scheduled_posts.values()):
+                return jsonify(ok=False, message="A post is being made right now. Try again once it's done."), 409
+            ad_research.start(get_active_account(), data.get("keywords") or [], data.get("location"),
+                              data.get("per_keyword"))
+    except ValueError as exc:
+        return jsonify(ok=False, message=str(exc)), 400
+    return jsonify(ok=True, status=ad_research.status())
+
+
+@web_bp.route("/ad_research/status")
+def ad_research_status():
+    from automation import ad_research
+    current = ad_research.status()
+    payload = {'ok': True, 'status': current}
+    if not current.get('running'):
+        payload['results'] = ad_research.load_results()
+    return jsonify(payload)
+
+
+@web_bp.route("/ad_research/stop", methods=["POST"])
+def ad_research_stop():
+    from automation import ad_research
+    return jsonify(ok=True, stopped=ad_research.stop(), status=ad_research.status())
+
+
+@web_bp.route("/ad_research/clear", methods=["POST"])
+def ad_research_clear():
+    from automation import ad_research
+    try:
+        ad_research.clear()
+    except ValueError as exc:
+        return jsonify(ok=False, message=str(exc)), 409
+    return jsonify(ok=True)
+
+
+@web_bp.route("/ad_research/backup/<listing_id>", methods=["POST"])
+def ad_research_backup(listing_id):
+    from automation import ad_research
+    try:
+        record_id = ad_research.add_to_backup(get_active_account(), listing_id)
+    except ValueError as exc:
+        return jsonify(ok=False, message=str(exc)), 400
+    return jsonify(ok=True, record_id=record_id, message='Added to Backup Posts (Extracted Listings).')
+
+
+@web_bp.route("/ad_research/photo/<listing_id>/<name>")
+def ad_research_photo(listing_id, name):
+    from automation import ad_research
+    if not re.fullmatch(r'\d{1,30}', listing_id) or not re.fullmatch(r'photo_\d{2}\.jpg', name):
+        return ('Not found', 404)
+    return send_from_directory(str(ad_research.photos_dir() / listing_id), name, max_age=0)
 
 
 @web_bp.route("/auto_listing")

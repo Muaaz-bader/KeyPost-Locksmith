@@ -58,6 +58,13 @@
         </div>
       </li>
 
+      <li class="{% if active_page == 'ad_research' %}active{% endif %}">
+        <div class="menu-link-wrap" onclick="window.location.href='{{ url_for('web.ad_research_page') }}'">
+          <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg></span>
+          <a href="{{ url_for('web.ad_research_page') }}">Ad Research</a>
+        </div>
+      </li>
+
       {% if active_account %}<li class="{% if active_page == 'backups' %}active{% endif %}">
         <div class="menu-link-wrap" onclick="window.location.href='{{ url_for('web.backup_listings_page') }}'">
           <span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 7h16v13H4zM8 7V4h8v3M8 12h8M8 16h5"></path></svg></span>
